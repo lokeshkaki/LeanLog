@@ -9,10 +9,10 @@ import SwiftUI
 
 struct AppTheme {
     // MARK: - Macro Colors
-    static let calories = Color.yellow
-    static let protein = Color.green
-    static let carbs = Color.indigo
-    static let fat = Color.orange
+    static let calories = Color(red: 1.0, green: 0.65, blue: 0.2)    // Warm amber
+    static let protein = Color(red: 0.4, green: 0.7, blue: 0.3)     // Forest green
+    static let carbs = Color(red: 0.8, green: 0.5, blue: 0.9)       // Soft purple
+    static let fat = Color(red: 1.0, green: 0.8, blue: 0.3)         // Golden yellow
     
     // MARK: - Progress Colors
     static let progressNormal = Color.primary

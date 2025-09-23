@@ -7,10 +7,10 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct WeeklyView: View {
     @State private var selectedWeekStart = Calendar.current.startOfDay(for: .now)
+    // Remove selectedMacro since we don't need it anymore
 
     // MARK: - Formatters
     private static let shortDayFormatter: DateFormatter = {
@@ -68,17 +68,7 @@ struct WeeklyView: View {
                         .padding(.horizontal)
                         .padding(.top)
 
-                        // MARK: Weekly chart
-                        WeeklySummaryView(referenceDay: selectedWeekStart)
-                            .frame(height: 240)
-                            .padding(.horizontal)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color(uiColor: .secondarySystemBackground))
-                            )
-                            .padding(.horizontal)
-
-                        // MARK: Weekly stats
+                        // MARK: Weekly stats (non-interactive)
                         WeeklyStatsView(weekStart: weekRange.start)
                             .padding(.horizontal)
                         

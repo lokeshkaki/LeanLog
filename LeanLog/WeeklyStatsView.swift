@@ -10,6 +10,7 @@ import SwiftData
 
 struct WeeklyStatsView: View {
     let weekStart: Date
+    // Remove @Binding since we don't need macro selection anymore
     
     @Query(sort: [SortDescriptor(\FoodEntry.date, order: .forward)])
     private var allEntries: [FoodEntry]
@@ -27,12 +28,11 @@ struct WeeklyStatsView: View {
     private var weeklyAverages: (avgCalories: Int, avgProtein: Double, avgCarbs: Double, avgFat: Double) {
         guard !weekEntries.isEmpty else { return (0, 0, 0, 0) }
         
-        // Group entries by day to get unique days with food logged
         let daysWithEntries = Set(weekEntries.map {
             Calendar.current.startOfDay(for: $0.date)
         })
         
-        let daysCount = max(1, daysWithEntries.count) // Avoid division by zero
+        let daysCount = max(1, daysWithEntries.count)
         
         let totalCalories = weekEntries.reduce(0) { $0 + $1.calories }
         let totalProtein = weekEntries.reduce(0) { $0 + ($1.protein ?? 0) }
@@ -48,69 +48,53 @@ struct WeeklyStatsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Weekly Statistics")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            VStack(spacing: 12) {
-                // Average calories and protein
-                HStack(spacing: 12) {
-                    StatCard(
-                        title: "Daily Avg",
-                        value: "\(weeklyAverages.avgCalories)",
-                        color: AppTheme.calories,
-                        unit: "kcal",
-                        icon: AppTheme.macroIcon(for: .calories)
-                    )
-                    
-                    StatCard(
-                        title: "Daily Avg",
-                        value: String(format: "%.1f", weeklyAverages.avgProtein),
-                        color: AppTheme.protein,
-                        unit: "g",
-                        icon: AppTheme.macroIcon(for: .protein)
-                    )
-                }
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                StatCard(
+                    macroType: .calories,
+                    value: "\(weeklyAverages.avgCalories)"
+                )
                 
-                // Average carbs and fat
-                HStack(spacing: 12) {
-                    StatCard(
-                        title: "Daily Avg",
-                        value: String(format: "%.1f", weeklyAverages.avgCarbs),
-                        color: AppTheme.carbs,
-                        unit: "g",
-                        icon: AppTheme.macroIcon(for: .carbs)
-                    )
-                    
-                    StatCard(
-                        title: "Daily Avg",
-                        value: String(format: "%.1f", weeklyAverages.avgFat),
-                        color: AppTheme.fat,
-                        unit: "g",
-                        icon: AppTheme.macroIcon(for: .fat)
-                    )
-                }
+                StatCard(
+                    macroType: .protein,
+                    value: String(format: "%.1f", weeklyAverages.avgProtein)
+                )
+            }
+            
+            HStack(spacing: 12) {
+                StatCard(
+                    macroType: .carbs,
+                    value: String(format: "%.1f", weeklyAverages.avgCarbs)
+                )
+                
+                StatCard(
+                    macroType: .fat,
+                    value: String(format: "%.1f", weeklyAverages.avgFat)
+                )
             }
         }
     }
 }
 
+// Simple non-interactive stat card
 struct StatCard: View {
-    let title: String
+    let macroType: MacroType
     let value: String
-    let color: Color
-    let unit: String
-    let icon: String
+    
+    private var macroUnit: String {
+        switch macroType {
+        case .calories: return "kcal"
+        case .protein, .carbs, .fat: return "g"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: icon)
+            Image(systemName: AppTheme.macroIcon(for: macroType))
                 .font(.title3)
-                .foregroundStyle(color)
+                .foregroundStyle(AppTheme.macroColor(for: macroType))
             
-            Text(title)
+            Text("Daily Avg")
                 .font(.caption)
                 .foregroundStyle(AppTheme.secondary)
                 .multilineTextAlignment(.center)
@@ -119,9 +103,9 @@ struct StatCard: View {
                 Text(value)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundStyle(color)
+                    .foregroundStyle(AppTheme.macroColor(for: macroType))
                 
-                Text(unit)
+                Text(macroUnit)
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondary)
                     .padding(.bottom, 2)
