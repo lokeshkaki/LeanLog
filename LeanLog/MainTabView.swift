@@ -16,6 +16,12 @@ struct MainTabView: View {
                     Text("Home")
                 }
             
+            MealsView()
+                .tabItem {
+                    Image(systemName: "fork.knife")
+                    Text("Meals")
+                }
+            
             WeeklyView()
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
