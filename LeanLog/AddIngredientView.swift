@@ -2,7 +2,10 @@
 //  AddIngredientView.swift
 //  LeanLog
 //
-//  Created by Lokesh Kaki on 9/22/25.
+//  Clean flow: No redundant Quantity (use serving size + unit).
+//  Prominent system segmented control (large) under the title.
+//  Manual uses AddFood-style macro grid with in-field units.
+//  System keyboard toolbar “Done” for all inputs.
 //
 
 import SwiftUI
@@ -11,212 +14,17 @@ import SwiftData
 struct AddIngredientView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
-    let onIngredientAdded: (MealIngredient) -> Void
-    
-    @State private var selectedTab = 0
-    @State private var quantity: Double = 1.0
-    
-    var body: some View {
-        NavigationStack {
-            TabView(selection: $selectedTab) {
-                SearchIngredientsView(quantity: $quantity, onIngredientAdded: onIngredientAdded)
-                    .tabItem {
-                        Label("Search", systemImage: "magnifyingglass")
-                    }
-                    .tag(0)
-                
-                ManualIngredientView(quantity: $quantity, onIngredientAdded: onIngredientAdded)
-                    .tabItem {
-                        Label("Manual", systemImage: "square.and.pencil")
-                    }
-                    .tag(1)
-                
-                RecentIngredientsView(quantity: $quantity, onIngredientAdded: onIngredientAdded)
-                    .tabItem {
-                        Label("Recent", systemImage: "clock")
-                    }
-                    .tag(2)
-            }
-            .navigationTitle("Add Ingredient")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-        }
-    }
-}
 
-// Search ingredients using existing USDA search
-struct SearchIngredientsView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    @Binding var quantity: Double
     let onIngredientAdded: (MealIngredient) -> Void
-    
-    @State private var query = ""
-    @State private var results: [FDCSearchFood] = []
-    @State private var isLoading = false
-    @State private var error: String?
-    @State private var searchTask: Task<Void, Never>?
-    
-    private let usda = USDAService(apiKey: Secrets.usdaApiKey)
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            quantitySelector
-            
-            Divider()
-            
-            Group {
-                if isLoading {
-                    ProgressView("Searching...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if !results.isEmpty {
-                    List(results) { item in
-                        Button(action: {
-                            Task { await selectSearchResult(item) }
-                        }) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.description)
-                                    .font(.body)
-                                    .lineLimit(2)
-                                    .foregroundStyle(.primary)
-                                
-                                if let brand = item.brandName {
-                                    Text(brand)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                } else if !query.isEmpty {
-                    ContentUnavailableView("No results", systemImage: "magnifyingglass")
-                } else {
-                    ContentUnavailableView.search
-                }
-            }
-        }
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
-        .onChange(of: query) { _, newValue in
-            performSearchDebounced()
-        }
-        .onDisappear {
-            searchTask?.cancel()
-        }
-    }
-    
-    private var quantitySelector: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Quantity:")
-                    .font(.headline)
-                Spacer()
-                Text("\(String(format: "%.2f", quantity))×")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.blue)
-            }
-            
-            HStack(spacing: 20) {
-                Button("-") {
-                    quantity = max(0.1, quantity - 0.25)
-                }
-                .buttonStyle(.bordered)
-                .disabled(quantity <= 0.1)
-                
-                Slider(value: $quantity, in: 0.1...10, step: 0.25)
-                
-                Button("+") {
-                    quantity = min(10, quantity + 0.25)
-                }
-                .buttonStyle(.bordered)
-                .disabled(quantity >= 10)
-            }
-        }
-        .padding()
-        .background(Color(uiColor: .secondarySystemBackground))
-    }
-    
-    private func performSearchDebounced() {
-        searchTask?.cancel()
-        
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard trimmedQuery.count >= 2 else {
-            results = []
-            error = nil
-            isLoading = false
-            return
-        }
-        
-        searchTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard !Task.isCancelled else { return }
-            await performSearch(trimmedQuery)
-        }
-    }
-    
-    @MainActor
-    private func performSearch(_ term: String) async {
-        isLoading = true
-        error = nil
-        
-        do {
-            let searchResults = try await usda.searchFoods(query: term, pageSize: 20)
-            
-            let currentTerm = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard term == currentTerm else { return }
-            
-            results = searchResults
-            error = nil
-        } catch {
-            let currentTerm = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard term == currentTerm else { return }
-            
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            results = []
-        }
-        
-        isLoading = false
-    }
-    
-    private func selectSearchResult(_ item: FDCSearchFood) async {
-        do {
-            let detail = try await usda.fetchFoodDetail(fdcId: item.fdcId)
-            let macros = detail.extractMacros()
-            
-            let ingredient = MealIngredient(
-                name: detail.description ?? item.description,
-                quantity: quantity,
-                calories: macros.kcal,
-                protein: macros.protein,
-                carbs: macros.carbs,
-                fat: macros.fat,
-                servingSize: detail.actualServingSize,
-                servingUnit: detail.actualServingUnit,
-                source: "USDA"
-            )
-            
-            onIngredientAdded(ingredient)
-            dismiss()
-        } catch {
-            print("Error fetching ingredient details: \(error)")
-        }
-    }
-}
 
-// Manual ingredient entry
-struct ManualIngredientView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    @Binding var quantity: Double
-    let onIngredientAdded: (MealIngredient) -> Void
-    
+    enum Mode: String, CaseIterable, Identifiable {
+        case search = "Search", manual = "Manual", recent = "Recent"
+        var id: String { rawValue }
+    }
+
+    @State private var mode: Mode = .manual
+
+    // Manual fields
     @State private var name = ""
     @State private var calories = ""
     @State private var protein = ""
@@ -224,235 +32,404 @@ struct ManualIngredientView: View {
     @State private var fat = ""
     @State private var servingSize = ""
     @State private var servingUnit = ""
-    
-    @FocusState private var focusedField: Field?
-    
-    enum Field {
-        case name, calories, protein, carbs, fat, servingSize, servingUnit
-    }
-    
-    private var isValid: Bool {
+
+    @FocusState private var focused: ManualField?
+    enum ManualField { case name, size, unit, cals, prot, carbs, fat }
+
+    // Search
+    @State private var query = ""
+    @State private var results: [FDCSearchFood] = []
+    @State private var searching = false
+    @State private var searchTask: Task<Void, Never>?
+    private let usda = USDAService(apiKey: Secrets.usdaApiKey)
+
+    // Recent
+    @Query(sort: [SortDescriptor(\FoodEntry.timestamp, order: .reverse)])
+    private var allEntries: [FoodEntry]
+
+    private var isManualValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !calories.isEmpty &&
         Int(calories) != nil
     }
-    
+
     var body: some View {
-        Form {
-            Section("Ingredient Details") {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+
+                    // Prominent large segmented tabs (no wrapping)
+                    Picker("", selection: $mode) {
+                        ForEach(Mode.allCases) { m in
+                            Text(m.rawValue)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.9)
+                                .tag(m)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .controlSize(.large)
+                    .tint(AppTheme.Colors.accent)
+
+                    Group {
+                        switch mode {
+                        case .search:
+                            searchCard
+                                .modernCard()
+                            searchResultsList
+                        case .manual:
+                            manualDetailsCard
+                                .modernCard()
+                            manualNutritionCard
+                                .modernCard()
+                            addButton // CTA outside card
+                        case .recent:
+                            recentList
+                        }
+                    }
+                }
+                .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                .padding(.top, AppTheme.Spacing.xl)
+                .padding(.bottom, 20)
+            }
+            .screenBackground()
+            .navigationBarTitleDisplayMode(.inline)
+            .modernNavigation()
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Add Ingredient")
+                        .font(AppTheme.Typography.title3)
+                        .foregroundStyle(AppTheme.Colors.labelPrimary)
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    }
+                    .accessibilityLabel("Cancel")
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focused = nil
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                    .fontWeight(.semibold)
+                    .buttonBorderShape(.capsule)
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
+        .onDisappear { searchTask?.cancel() }
+    }
+
+    // MARK: - Manual
+
+    private var manualDetailsCard: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            Text("Ingredient details")
+                .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
+
+            HStack(spacing: AppTheme.Spacing.md) {
+                Image(systemName: "text.cursor").foregroundStyle(AppTheme.Colors.labelTertiary)
                 TextField("Ingredient name", text: $name)
-                    .focused($focusedField, equals: .name)
-                
-                HStack {
+                    .focused($focused, equals: .name)
+                    .submitLabel(.next)
+                    .onSubmit { focused = .size }
+                    .foregroundStyle(AppTheme.Colors.labelPrimary)
+            }
+            .modernField(focused: focused == .name)
+
+            HStack(spacing: AppTheme.Spacing.md) {
+                HStack(spacing: AppTheme.Spacing.md) {
+                    Image(systemName: "scalemass").foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Serving size", text: $servingSize)
                         .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .servingSize)
-                    TextField("Unit", text: $servingUnit)
-                        .focused($focusedField, equals: .servingUnit)
+                        .focused($focused, equals: .size)
+                        .submitLabel(.next)
+                        .onSubmit { focused = .unit }
+                        .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
-            }
-            
-            Section("Nutrition (per serving)") {
-                HStack {
-                    Label("Calories", systemImage: "flame.fill")
-                        .foregroundStyle(AppTheme.calories)
-                    Spacer()
-                    TextField("0", text: $calories)
-                        .keyboardType(.numberPad)
-                        .focused($focusedField, equals: .calories)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                    Text("kcal")
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack {
-                    Label("Protein", systemImage: "leaf.fill")
-                        .foregroundStyle(AppTheme.protein)
-                    Spacer()
-                    TextField("0", text: $protein)
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .protein)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                    Text("g")
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack {
-                    Label("Carbs", systemImage: "square.stack.3d.up.fill")
-                        .foregroundStyle(AppTheme.carbs)
-                    Spacer()
-                    TextField("0", text: $carbs)
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .carbs)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                    Text("g")
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack {
-                    Label("Fat", systemImage: "drop.fill")
-                        .foregroundStyle(AppTheme.fat)
-                    Spacer()
-                    TextField("0", text: $fat)
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .fat)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                    Text("g")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            Section("Quantity") {
-                HStack {
-                    Text("Amount:")
-                    Spacer()
-                    Text("\(String(format: "%.2f", quantity))× servings")
-                        .fontWeight(.semibold)
-                }
-                
-                Stepper("", value: $quantity, in: 0.1...10, step: 0.25)
-                    .labelsHidden()
-            }
-            
-            Section {
-                Button("Add Ingredient") {
-                    addIngredient()
-                }
-                .disabled(!isValid)
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    focusedField = nil
-                }
-                .fontWeight(.semibold)
-            }
-        }
-    }
-    
-    private func addIngredient() {
-        let ingredient = MealIngredient(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            quantity: quantity,
-            calories: Int(calories) ?? 0,
-            protein: protein.isEmpty ? nil : Double(protein),
-            carbs: carbs.isEmpty ? nil : Double(carbs),
-            fat: fat.isEmpty ? nil : Double(fat),
-            servingSize: servingSize.isEmpty ? nil : Double(servingSize),
-            servingUnit: servingUnit.isEmpty ? nil : servingUnit.trimmingCharacters(in: .whitespacesAndNewlines),
-            source: "Manual"
-        )
-        
-        onIngredientAdded(ingredient)
-        dismiss()
-    }
-}
+                .modernField(focused: focused == .size)
 
-// Recent ingredients from food logs
-struct RecentIngredientsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    
-    @Binding var quantity: Double
-    let onIngredientAdded: (MealIngredient) -> Void
-    
-    // Calculate the date 30 days ago outside of the predicate
-    private var thirtyDaysAgo: Date {
-        Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-    }
-    
-    @Query(sort: [SortDescriptor(\FoodEntry.timestamp, order: .reverse)])
-    private var allFoodEntries: [FoodEntry]
-    
-    private var recentFoods: [FoodEntry] {
-        allFoodEntries.filter { entry in
-            entry.timestamp >= thirtyDaysAgo
-        }
-    }
-    
-    private var uniqueRecentFoods: [FoodEntry] {
-        var seen = Set<String>()
-        return recentFoods.compactMap { entry in
-            let key = entry.name.lowercased()
-            if seen.contains(key) {
-                return nil
-            } else {
-                seen.insert(key)
-                return entry
+                TextField("Unit (e.g., g, oz)", text: $servingUnit)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .focused($focused, equals: .unit)
+                    .submitLabel(.next)
+                    .onSubmit { focused = .cals }
+                    .modernField(focused: focused == .unit)
+                    .frame(maxWidth: 160)
             }
         }
     }
-    
-    var body: some View {
-        VStack(spacing: 0) {
+
+    private var manualNutritionCard: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.rowSpacing) {
+            Text("Nutrition (per serving)")
+                .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
+
+            let columns: [GridItem] = [
+                GridItem(.flexible(), spacing: AppTheme.Spacing.lg),
+                GridItem(.flexible(), spacing: AppTheme.Spacing.lg)
+            ]
+
+            LazyVGrid(columns: columns, spacing: AppTheme.Spacing.lg) {
+                macroField(icon: AppTheme.Icons.calories, title: "Calories", unit: "kcal",
+                           color: AppTheme.Colors.calories, text: $calories, field: .cals, keyboard: .numberPad)
+                macroField(icon: AppTheme.Icons.protein,  title: "Protein",  unit: "g",
+                           color: AppTheme.Colors.protein,  text: $protein,  field: .prot, keyboard: .decimalPad)
+                macroField(icon: AppTheme.Icons.carbs,    title: "Carbs",    unit: "g",
+                           color: AppTheme.Colors.carbs,    text: $carbs,    field: .carbs, keyboard: .decimalPad)
+                macroField(icon: AppTheme.Icons.fat,      title: "Fat",      unit: "g",
+                           color: AppTheme.Colors.fat,      text: $fat,      field: .fat, keyboard: .decimalPad)
+            }
+        }
+    }
+
+    private var manualFieldOrder: [ManualField] { [.name, .size, .unit, .cals, .prot, .carbs, .fat] }
+
+    private func advance(from field: ManualField) {
+        if let idx = manualFieldOrder.firstIndex(of: field), idx < manualFieldOrder.count - 1 {
+            focused = manualFieldOrder[idx + 1]
+        } else {
+            focused = nil
+        }
+    }
+
+    private func macroField(icon: String,
+                            title: String,
+                            unit: String,
+                            color: Color,
+                            text: Binding<String>,
+                            field: ManualField,
+                            keyboard: UIKeyboardType) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: AppTheme.Spacing.sm) {
+                Image(systemName: icon)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(color)
+                    .frame(width: 22)
+                Text(title)
+                    .font(AppTheme.Typography.callout)
+                    .foregroundStyle(AppTheme.Colors.labelSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+            }
+
             HStack {
-                Text("Quantity:")
-                    .font(.headline)
-                Spacer()
-                Text("\(String(format: "%.2f", quantity))×")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.blue)
+                TextField("0", text: text)
+                    .keyboardType(keyboard)
+                    .focused($focused, equals: field)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(AppTheme.Colors.labelPrimary)
+                    .submitLabel(.next)
+                    .onSubmit { advance(from: field) }
+
+                Text(unit)
+                    .font(AppTheme.Typography.callout)
+                    .foregroundStyle(AppTheme.Colors.labelTertiary)
             }
-            .padding()
-            .background(Color(uiColor: .secondarySystemBackground))
-            
-            Stepper("", value: $quantity, in: 0.1...10, step: 0.25)
-                .padding(.horizontal)
-                .labelsHidden()
-            
-            Divider()
-            
-            if uniqueRecentFoods.isEmpty {
+            .modernField(focused: focused == field)
+        }
+    }
+
+    private var addButton: some View {
+        Button(action: addManualIngredient) {
+            HStack(spacing: AppTheme.Spacing.sm) {
+                Image(systemName: AppTheme.Icons.add)
+                Text("Add Ingredient")
+                    .font(AppTheme.Typography.bodyEmphasized)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.95)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium).fill(AppTheme.Colors.accentGradient))
+        }
+        .disabled(!isManualValid)
+        .opacity(isManualValid ? 1 : 0.5)
+    }
+
+    // MARK: - Search
+
+    private var searchCard: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            Text("Search USDA")
+                .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
+
+            HStack(spacing: AppTheme.Spacing.md) {
+                Image(systemName: AppTheme.Icons.search).foregroundStyle(AppTheme.Colors.labelTertiary)
+                TextField("Search foods…", text: $query)
+                    .textInputAutocapitalization(.words)
+                    .disableAutocorrection(true)
+                    .onChange(of: query) { _, _ in debounceSearch() }
+            }
+            .modernField()
+
+            if searching {
+                HStack { Spacer(); ProgressView(); Spacer() }
+            }
+        }
+    }
+
+    private var searchResultsList: some View {
+        VStack(spacing: AppTheme.Spacing.md) {
+            ForEach(results) { item in
+                Button { Task { await selectSearchItem(item) } } label: {
+                    HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.description)
+                                .font(AppTheme.Typography.body)
+                                .foregroundStyle(AppTheme.Colors.labelPrimary)
+                                .lineLimit(2)
+                            if let brand = item.brandName {
+                                Text(brand)
+                                    .font(AppTheme.Typography.caption)
+                                    .foregroundStyle(AppTheme.Colors.labelSecondary)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(AppTheme.Colors.labelTertiary)
+                    }
+                    .padding(AppTheme.Spacing.cardPadding)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium, style: .continuous)
+                            .fill(AppTheme.Colors.surface)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium, style: .continuous)
+                                    .strokeBorder(AppTheme.Colors.cardStrokeGradient, lineWidth: 1)
+                            }
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !query.isEmpty && results.isEmpty && !searching {
+                ContentUnavailableView("No results", systemImage: "magnifyingglass")
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func debounceSearch() {
+        searchTask?.cancel()
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard term.count >= 2 else { results = []; searching = false; return }
+        searchTask = Task { @MainActor in
+            searching = true
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            await runSearch(term)
+        }
+    }
+
+    @MainActor
+    private func runSearch(_ term: String) async {
+        do {
+            let r = try await usda.searchFoods(query: term, pageSize: 20)
+            guard term == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            results = r; searching = false
+        } catch {
+            guard term == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            results = []; searching = false
+        }
+    }
+
+    private func selectSearchItem(_ item: FDCSearchFood) async {
+        do {
+            let d = try await usda.fetchFoodDetail(fdcId: item.fdcId)
+            let m = d.extractMacros()
+            let ing = MealIngredient(
+                name: d.description ?? item.description,
+                quantity: 1.0,
+                calories: m.kcal,
+                protein: m.protein,
+                carbs: m.carbs,
+                fat: m.fat,
+                servingSize: d.actualServingSize,
+                servingUnit: d.actualServingUnit,
+                source: "USDA"
+            )
+            onIngredientAdded(ing)
+            dismiss()
+        } catch {
+            print("USDA error: \(error)")
+        }
+    }
+
+    // MARK: - Recent
+
+    private var recentList: some View {
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let unique = uniqueRecent(from: allEntries.filter { $0.timestamp >= thirtyDaysAgo })
+
+        return VStack(spacing: AppTheme.Spacing.md) {
+            if unique.isEmpty {
                 ContentUnavailableView(
                     "No Recent Foods",
                     systemImage: "clock",
-                    description: Text("Foods you've logged in the last 30 days will appear here")
+                    description: Text("Foods logged in the last 30 days will appear here")
                 )
+                .frame(maxWidth: .infinity)
             } else {
-                List(uniqueRecentFoods.prefix(20), id: \.id) { entry in
-                    Button(action: { selectRecentFood(entry) }) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.name)
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                            
-                            HStack {
-                                Text("\(entry.calories) kcal")
-                                    .font(.caption)
-                                    .foregroundStyle(AppTheme.calories)
-                                
-                                if let protein = entry.protein, protein > 0 {
-                                    Text("• P: \(String(format: "%.1f", protein))g")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                if let source = entry.source {
-                                    Text("• \(source)")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
+                ForEach(unique.prefix(20), id: \.id) { entry in
+                    Button { selectRecent(entry) } label: {
+                        HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.name)
+                                    .font(AppTheme.Typography.body)
+                                    .foregroundStyle(AppTheme.Colors.labelPrimary)
+                                HStack(spacing: 8) {
+                                    Text("\(entry.calories) kcal")
+                                        .font(AppTheme.Typography.caption)
+                                        .foregroundStyle(AppTheme.Colors.calories)
+                                    if let p = entry.protein, p > 0 {
+                                        Text("• P \(String(format: "%.1f", p))g")
+                                            .font(AppTheme.Typography.caption)
+                                            .foregroundStyle(AppTheme.Colors.labelSecondary)
+                                    }
+                                    if let src = entry.source {
+                                        Text("• \(src)")
+                                            .font(AppTheme.Typography.caption)
+                                            .foregroundStyle(AppTheme.Colors.labelTertiary)
+                                    }
                                 }
                             }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(AppTheme.Colors.labelTertiary)
                         }
+                        .padding(AppTheme.Spacing.cardPadding)
+                        .background(
+                            RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium, style: .continuous)
+                                .fill(AppTheme.Colors.surface)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium, style: .continuous)
+                                        .strokeBorder(AppTheme.Colors.cardStrokeGradient, lineWidth: 1)
+                                }
+                        )
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
     }
-    
-    private func selectRecentFood(_ entry: FoodEntry) {
-        let ingredient = MealIngredient(
+
+    private func uniqueRecent(from entries: [FoodEntry]) -> [FoodEntry] {
+        var seen = Set<String>()
+        return entries.compactMap { e in
+            let key = e.name.lowercased()
+            if seen.contains(key) { return nil }
+            seen.insert(key); return e
+        }
+    }
+
+    private func selectRecent(_ entry: FoodEntry) {
+        let ing = MealIngredient(
             name: entry.name,
-            quantity: quantity,
+            quantity: 1.0,
             calories: entry.calories,
             protein: entry.protein,
             carbs: entry.carbs,
@@ -461,8 +438,26 @@ struct RecentIngredientsView: View {
             servingUnit: entry.servingUnit,
             source: entry.source
         )
-        
-        onIngredientAdded(ingredient)
+        onIngredientAdded(ing)
+        dismiss()
+    }
+
+    // MARK: - Actions
+
+    private func addManualIngredient() {
+        guard isManualValid else { return }
+        let ing = MealIngredient(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            quantity: 1.0,
+            calories: Int(calories) ?? 0,
+            protein: protein.isEmpty ? nil : Double(protein),
+            carbs: carbs.isEmpty ? nil : Double(carbs),
+            fat: fat.isEmpty ? nil : Double(fat),
+            servingSize: servingSize.isEmpty ? nil : Double(servingSize),
+            servingUnit: servingUnit.isEmpty ? nil : servingUnit.trimmingCharacters(in: .whitespacesAndNewlines),
+            source: "Manual"
+        )
+        onIngredientAdded(ing)
         dismiss()
     }
 }

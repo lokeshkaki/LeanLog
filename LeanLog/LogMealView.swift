@@ -3,6 +3,7 @@
 //  LeanLog
 //
 //  Created by Lokesh Kaki on 9/22/25.
+//  Updated: Prominent meal header (title + subtitle stack), compact meta chips, slim paddings
 //
 
 import SwiftUI
@@ -11,565 +12,455 @@ import SwiftData
 struct LogMealView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
+
     let meal: Meal
-    
+
     @State private var portionGrams: Double = 100
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
     @State private var logAsIndividualIngredients = false
-    @State private var showIngredients = false // Collapsed by default
-    
+    @State private var showIngredients = false
+
+    @FocusState private var focusedField: Field?
+    enum Field: Hashable { case none }
+
+    // MARK: - Computed
+
     private var portionNutrition: (calories: Double, protein: Double, carbs: Double, fat: Double) {
-        let nutrition = meal.nutritionPer100g
-        let factor = portionGrams / 100.0
-        
-        return (
-            calories: nutrition.calories * factor,
-            protein: nutrition.protein * factor,
-            carbs: nutrition.carbs * factor,
-            fat: nutrition.fat * factor
-        )
+        let n = meal.nutritionPer100g
+        let f = max(0, portionGrams) / 100.0
+        return (n.calories * f, n.protein * f, n.carbs * f, n.fat * f)
     }
-    
+
     private var portionPercentage: Double {
-        (portionGrams / meal.totalYieldGrams) * 100
+        guard meal.totalYieldGrams > 0 else { return 0 }
+        return (portionGrams / meal.totalYieldGrams) * 100
     }
-    
+
+    private var createdShort: String {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        if let created = meal.createdAt as Date? {
+            return f.localizedString(for: created, relativeTo: Date())
+        }
+        return "—"
+    }
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Meal Information Section
-                mealInfoSection
-                
-                // Clean divider
-                Rectangle()
-                    .fill(Color(uiColor: .separator))
-                    .frame(height: 1)
-                
-                // Logging Section
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        portionCard
-                        nutritionCard
-                        logSettingsCard
-                        logButton
-                    }
-                    .padding(20)
+            ScrollView {
+                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+                    mealInfoSection
+                        .modernCard(elevated: true)
+
+                    portionCard
+                        .modernCard()
+
+                    nutritionCard
+                        .modernCard()
+
+                    logSettingsCard
+                        .modernCard()
+
+                    logButton
                 }
-                .background(Color(uiColor: .systemGroupedBackground))
+                .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                .padding(.top, AppTheme.Spacing.xl)
             }
-            .navigationTitle("Log Meal")
+            .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
+            .modernNavigation()
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Log Meal")
+                        .font(AppTheme.Typography.title3)
+                        .foregroundStyle(AppTheme.Colors.labelPrimary)
+                }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: AppTheme.Icons.close)
+                            .imageScale(.medium)
+                    }
+                    .accessibilityLabel("Cancel")
                 }
             }
         }
     }
-    
-    // MARK: - Meal Information Section
-    private var mealInfoSection: some View {
-        VStack(spacing: 0) {
-            // Header - consistent padding with cards below
-            VStack(spacing: 16) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Text(meal.name)
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                            
-                            if meal.isFavorite {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                            }
-                        }
-                        
-                        HStack(spacing: 16) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "scalemass")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("Yield: \(Int(meal.totalYieldGrams))g")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            HStack(spacing: 6) {
-                                Image(systemName: "clock")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("Created \(meal.createdDateString)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                
-                // Collapsible Ingredients - more apparent button
-                if !meal.ingredients.isEmpty {
-                    VStack(spacing: 0) {
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showIngredients.toggle()
-                            }
-                        }) {
-                            HStack {
-                                Text("Ingredients")
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                
-                                Text("(\(meal.ingredients.count))")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                
-                                Spacer()
-                                
-                                HStack(spacing: 6) {
-                                    Text(showIngredients ? "Hide" : "Show")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.blue)
-                                    
-                                    Image(systemName: "chevron.down")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.blue)
-                                        .rotationEffect(.degrees(showIngredients ? 180 : 0))
-                                }
-                            }
-                            .padding(.vertical, 8)
-                            .background(Color.clear)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        if showIngredients {
-                            VStack(spacing: 0) {
-                                ForEach(Array(meal.ingredients.enumerated()), id: \.offset) { index, ingredient in
-                                    HStack(alignment: .top) {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(ingredient.name)
-                                                .font(.body)
-                                                .fontWeight(.medium)
-                                            
-                                            // Macros for each ingredient
-                                            HStack(spacing: 8) {
-                                                if let protein = ingredient.protein, protein > 0 {
-                                                    Text("P \(String(format: "%.1f", protein * ingredient.quantity))g")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(AppTheme.protein)
-                                                }
-                                                
-                                                if let carbs = ingredient.carbs, carbs > 0 {
-                                                    Text("C \(String(format: "%.1f", carbs * ingredient.quantity))g")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(AppTheme.carbs)
-                                                }
-                                                
-                                                if let fat = ingredient.fat, fat > 0 {
-                                                    Text("F \(String(format: "%.1f", fat * ingredient.quantity))g")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(AppTheme.fat)
-                                                }
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        VStack(alignment: .trailing, spacing: 4) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "flame.fill")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(AppTheme.calories)
-                                                Text("\(Int(Double(ingredient.calories) * ingredient.quantity))")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                Text("kcal")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            
-                                            // Moved servings underneath calories
-                                            Text("\(String(format: "%.2g", ingredient.quantity))× serving")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .padding(.vertical, 12)
-                                    
-                                    if index < meal.ingredients.count - 1 {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .padding(.top, 16)
-                        }
-                    }
-                }
-            }
-            .padding(20) // Same padding as cards below
+
+    // MARK: - Subviews
+
+    private func metaChip(_ system: String, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: system)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(AppTheme.Colors.labelSecondary)
+            Text(text)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Colors.labelSecondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
-        .background(Color(uiColor: .systemBackground))
-    }
-    
-    // MARK: - Logging Section Cards
-    private var portionCard: some View {
-        VStack(spacing: 20) {
-            HStack {
-                Text("Select Portion")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Spacer()
-            }
-            
-            VStack(spacing: 20) {
-                // Weight display
-                HStack {
-                    Text("Weight")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(Int(portionGrams))g")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundStyle(.blue)
-                }
-                
-                VStack(spacing: 12) {
-                    Text("That's \(String(format: "%.1f", portionPercentage))% of the total meal")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    // Clean slider
-                    VStack(spacing: 8) {
-                        Slider(value: $portionGrams, in: 10...meal.totalYieldGrams, step: 5)
-                        
-                        HStack {
-                            Text("10g")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                            Spacer()
-                            Text("\(Int(meal.totalYieldGrams))g")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(24)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(uiColor: .secondarySystemBackground))
-                .stroke(Color(uiColor: .separator), lineWidth: 0.5)
+            Capsule()
+                .fill(AppTheme.Colors.input)
         )
     }
-    
+
+    // Prominent header: title on first row, chips on second row for clarity and emphasis
+    private var mealInfoSection: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            HStack(alignment: .center, spacing: AppTheme.Spacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(AppTheme.Colors.accentGradient)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "fork.knife")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white)
+                        .font(.system(size: 22, weight: .semibold))
+                }
+
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+                    // Title row: larger, heavier for prominence
+                    HStack(spacing: 8) {
+                        Text(meal.name)
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.labelPrimary)
+                            .lineLimit(2)
+                        if meal.isFavorite {
+                            Image(systemName: "star.fill")
+                                .foregroundStyle(.yellow)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                    }
+
+                    // Meta chips row
+                    HStack(spacing: AppTheme.Spacing.sm) {
+                        metaChip("scalemass", "Yield: \(Int(meal.totalYieldGrams))g")
+                        metaChip("clock", createdShort)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            if !meal.ingredients.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) { showIngredients.toggle() }
+                    } label: {
+                        HStack {
+                            Text("Ingredients")
+                                .font(AppTheme.Typography.headline)
+                                .foregroundStyle(AppTheme.Colors.labelPrimary)
+                            Text("(\(meal.ingredients.count))")
+                                .font(AppTheme.Typography.subheadline)
+                                .foregroundStyle(AppTheme.Colors.labelSecondary)
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Text(showIngredients ? "Hide" : "Show")
+                                    .font(AppTheme.Typography.subheadline)
+                                    .foregroundStyle(AppTheme.Colors.accent)
+                                Image(systemName: "chevron.down")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.Colors.accent)
+                                    .rotationEffect(.degrees(showIngredients ? 180 : 0))
+                            }
+                        }
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                    }
+                    .buttonStyle(.plain)
+
+                    if showIngredients {
+                        VStack(spacing: 0) {
+                            ForEach(Array(meal.ingredients.enumerated()), id: \.offset) { idx, ing in
+                                HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(ing.name)
+                                            .font(AppTheme.Typography.body.weight(.medium))
+                                            .foregroundStyle(AppTheme.Colors.labelPrimary)
+                                        HStack(spacing: 8) {
+                                            if let p = ing.protein, p > 0 {
+                                                Text("P \(String(format: "%.1f", p * ing.quantity))g")
+                                                    .font(AppTheme.Typography.caption2)
+                                                    .foregroundStyle(AppTheme.Colors.protein)
+                                            }
+                                            if let c = ing.carbs, c > 0 {
+                                                Text("C \(String(format: "%.1f", c * ing.quantity))g")
+                                                    .font(AppTheme.Typography.caption2)
+                                                    .foregroundStyle(AppTheme.Colors.carbs)
+                                            }
+                                            if let f = ing.fat, f > 0 {
+                                                Text("F \(String(format: "%.1f", f * ing.quantity))g")
+                                                    .font(AppTheme.Typography.caption2)
+                                                    .foregroundStyle(AppTheme.Colors.fat)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: AppTheme.Icons.calories)
+                                                .font(.caption2)
+                                                .foregroundStyle(AppTheme.Colors.calories)
+                                            Text("\(Int(Double(ing.calories) * ing.quantity))")
+                                                .font(AppTheme.Typography.subheadline.weight(.semibold))
+                                                .foregroundStyle(AppTheme.Colors.labelPrimary)
+                                            Text("kcal")
+                                                .font(AppTheme.Typography.caption2)
+                                                .foregroundStyle(AppTheme.Colors.labelSecondary)
+                                        }
+                                        Text("\(String(format: "%.2g", ing.quantity))× serving")
+                                            .font(AppTheme.Typography.caption)
+                                            .foregroundStyle(AppTheme.Colors.labelSecondary)
+                                    }
+                                }
+                                .padding(.vertical, AppTheme.Spacing.sm)
+
+                                if idx < meal.ingredients.count - 1 {
+                                    Divider()
+                                }
+                            }
+                        }
+                        .padding(.top, AppTheme.Spacing.sm)
+                    }
+                }
+            }
+        }
+        // Slim, consistent with CreateMeal
+        .padding(.horizontal, AppTheme.Spacing.sm)
+        .padding(.vertical, AppTheme.Spacing.sm)
+    }
+
+    private var portionCard: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            Text("Select portion")
+                .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
+
+            HStack(alignment: .firstTextBaseline) {
+                Text("Weight")
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.Colors.labelSecondary)
+                Spacer()
+                Text("\(Int(portionGrams))g")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.accent)
+            }
+
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Text("That’s \(String(format: "%.1f", portionPercentage))% of the total meal")
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Colors.labelTertiary)
+
+                VStack(spacing: AppTheme.Spacing.sm) {
+                    Slider(value: $portionGrams, in: 10...max(10, meal.totalYieldGrams), step: 5)
+                    HStack {
+                        Text("10g").font(AppTheme.Typography.caption2).foregroundStyle(AppTheme.Colors.labelTertiary)
+                        Spacer()
+                        Text("\(Int(meal.totalYieldGrams))g").font(AppTheme.Typography.caption2).foregroundStyle(AppTheme.Colors.labelTertiary)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, AppTheme.Spacing.sm)
+        .padding(.vertical, AppTheme.Spacing.sm)
+    }
+
     private var nutritionCard: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             HStack {
-                Text("Nutrition Preview")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                Text("Nutrition preview")
+                    .font(AppTheme.Typography.headline)
+                    .foregroundStyle(AppTheme.Colors.labelPrimary)
                 Spacer()
                 Text("For \(Int(portionGrams))g")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Colors.labelTertiary)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(Color(uiColor: .systemFill))
-                    )
+                    .background(Capsule().fill(AppTheme.Colors.input))
             }
-            
-            // Modern nutrition grid with icons at bottom
-            VStack(spacing: 16) {
-                HStack(spacing: 16) {
-                    NutritionMiniCard(
-                        icon: "flame.fill",
-                        color: AppTheme.calories,
-                        value: "\(Int(round(portionNutrition.calories)))",
-                        unit: "kcal",
-                        label: "Calories"
-                    )
-                    
-                    NutritionMiniCard(
-                        icon: "leaf.fill",
-                        color: AppTheme.protein,
-                        value: String(format: "%.1f", portionNutrition.protein),
-                        unit: "g",
-                        label: "Protein"
-                    )
+
+            VStack(spacing: AppTheme.Spacing.md) {
+                HStack(spacing: AppTheme.Spacing.md) {
+                    NutritionMiniCard(icon: AppTheme.Icons.calories, color: AppTheme.Colors.calories, value: "\(Int(round(portionNutrition.calories)))", unit: "kcal", label: "Calories")
+                    NutritionMiniCard(icon: AppTheme.Icons.protein,  color: AppTheme.Colors.protein,  value: String(format: "%.1f", portionNutrition.protein), unit: "g", label: "Protein")
                 }
-                
-                HStack(spacing: 16) {
-                    NutritionMiniCard(
-                        icon: "square.stack.3d.up.fill",
-                        color: AppTheme.carbs,
-                        value: String(format: "%.1f", portionNutrition.carbs),
-                        unit: "g",
-                        label: "Carbs"
-                    )
-                    
-                    NutritionMiniCard(
-                        icon: "drop.fill",
-                        color: AppTheme.fat,
-                        value: String(format: "%.1f", portionNutrition.fat),
-                        unit: "g",
-                        label: "Fat"
-                    )
+                HStack(spacing: AppTheme.Spacing.md) {
+                    NutritionMiniCard(icon: AppTheme.Icons.carbs,    color: AppTheme.Colors.carbs,    value: String(format: "%.1f", portionNutrition.carbs),   unit: "g", label: "Carbs")
+                    NutritionMiniCard(icon: AppTheme.Icons.fat,      color: AppTheme.Colors.fat,      value: String(format: "%.1f", portionNutrition.fat),     unit: "g", label: "Fat")
                 }
             }
         }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(uiColor: .secondarySystemBackground))
-                .stroke(Color(uiColor: .separator), lineWidth: 0.5)
-        )
+        .padding(.horizontal, AppTheme.Spacing.sm)
+        .padding(.vertical, AppTheme.Spacing.sm)
     }
-    
+
     private var logSettingsCard: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            Text("Log settings")
+                .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
+
             HStack {
-                Text("Log Settings")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Spacer()
-            }
-            
-            VStack(spacing: 20) {
-                HStack {
+                HStack(spacing: AppTheme.Spacing.md) {
+                    Image(systemName: AppTheme.Icons.calendar)
+                        .foregroundStyle(AppTheme.Colors.accent)
+                        .frame(width: 24)
                     Text("Date")
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    DatePicker("", selection: $selectedDate, displayedComponents: [.date])
-                        .datePickerStyle(.compact)
-                        .labelsHidden()
+                        .font(AppTheme.Typography.body)
+                        .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
-                
-                // Redesigned log type - stack vertically for long names
-                VStack(spacing: 12) {
-                    HStack {
-                        Text("Log as")
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                        Spacer()
+                Spacer()
+                DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+            }
+            .padding(.horizontal, AppTheme.Spacing.md)
+            .padding(.vertical, AppTheme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small, style: .continuous)
+                    .fill(AppTheme.Colors.input)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small, style: .continuous)
+                            .strokeBorder(AppTheme.Colors.subtleStroke, lineWidth: 1)
                     }
-                    
-                    VStack(spacing: 12) {
-                        // Single meal entry - full width horizontal card
-                        Button(action: { logAsIndividualIngredients = false }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "square.stack")
-                                    .font(.title3)
-                                    .foregroundStyle(logAsIndividualIngredients ? Color.secondary : Color.blue)
-                                    .frame(width: 24)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Meal")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(logAsIndividualIngredients ? Color.secondary : Color.blue)
-                                    
-                                    Text("1 food entry")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.secondary)
-                                        .lineLimit(1)
-                                }
-                                
-                                Spacer()
-                                
-                                if !logAsIndividualIngredients {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.title3)
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(logAsIndividualIngredients ? Color.clear : Color.blue.opacity(0.1))
-                                    .stroke(logAsIndividualIngredients ? Color(uiColor: .separator) : Color.blue.opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        
-                        // Individual ingredients - full width horizontal card
-                        Button(action: { logAsIndividualIngredients = true }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "list.bullet")
-                                    .font(.title3)
-                                    .foregroundStyle(logAsIndividualIngredients ? Color.blue : Color.secondary)
-                                    .frame(width: 24)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ingredients")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(logAsIndividualIngredients ? Color.blue : Color.secondary)
-                                    
-                                    Text("\(meal.ingredients.count) separate food entries")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                if logAsIndividualIngredients {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.title3)
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(logAsIndividualIngredients ? Color.blue.opacity(0.1) : Color.clear)
-                                    .stroke(logAsIndividualIngredients ? Color.blue.opacity(0.3) : Color(uiColor: .separator), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
+            )
+
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                Text("Log as")
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.Colors.labelPrimary)
+
+                VStack(spacing: AppTheme.Spacing.sm) {
+                    Button { logAsIndividualIngredients = false } label: {
+                        selectionRow(icon: "square.stack", title: "Meal", subtitle: "1 food entry", selected: !logAsIndividualIngredients)
                     }
+                    .buttonStyle(.plain)
+
+                    Button { logAsIndividualIngredients = true } label: {
+                        selectionRow(icon: "list.bullet", title: "Ingredients", subtitle: "\(meal.ingredients.count) separate food entries", selected: logAsIndividualIngredients)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .padding(24)
+        .padding(.horizontal, AppTheme.Spacing.sm)
+        .padding(.vertical, AppTheme.Spacing.sm)
+    }
+
+    private func selectionRow(icon: String, title: String, subtitle: String, selected: Bool) -> some View {
+        HStack(spacing: AppTheme.Spacing.md) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(selected ? AppTheme.Colors.accent : AppTheme.Colors.labelSecondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppTheme.Typography.subheadline.weight(.semibold))
+                    .foregroundStyle(selected ? AppTheme.Colors.accent : AppTheme.Colors.labelSecondary)
+                Text(subtitle)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Colors.labelTertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if selected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.Colors.accent)
+            }
+        }
+        .padding(.horizontal, AppTheme.Spacing.md)
+        .padding(.vertical, AppTheme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(uiColor: .secondarySystemBackground))
-                .stroke(Color(uiColor: .separator), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(selected ? AppTheme.Colors.accent.opacity(0.12) : Color.clear)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(selected ? AppTheme.Colors.accent.opacity(0.3) : AppTheme.Colors.subtleStroke, lineWidth: 1)
+                }
         )
     }
-    
+
     private var logButton: some View {
         Button(action: logMealPortion) {
-            HStack {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title3)
+            HStack(spacing: AppTheme.Spacing.sm) {
+                Image(systemName: "plus.circle.fill").font(.title3)
                 Text("Log to Food Diary")
-                    .font(.headline)
+                    .font(AppTheme.Typography.body.weight(.semibold))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.blue)
-            )
+            .padding(.vertical, 16)
+            .background(RoundedRectangle(cornerRadius: 16).fill(AppTheme.Colors.accentGradient))
         }
-        .padding(.bottom, 20)
     }
-    
+
+    // MARK: - Actions
+
     private func logMealPortion() {
-        let portionFactor = portionGrams / meal.totalYieldGrams
-        let timestamp = Date()
-        
+        let factor = max(0, portionGrams) / max(1, meal.totalYieldGrams)
+        let ts = Date()
+
         if logAsIndividualIngredients {
-            // Log each ingredient separately, scaled by portion
-            for ingredient in meal.ingredients {
-                let scaledCalories = Int(round(Double(ingredient.calories) * ingredient.quantity * portionFactor))
-                let scaledProtein = (ingredient.protein ?? 0) * ingredient.quantity * portionFactor
-                let scaledCarbs = (ingredient.carbs ?? 0) * ingredient.quantity * portionFactor
-                let scaledFat = (ingredient.fat ?? 0) * ingredient.quantity * portionFactor
-                
+            for ing in meal.ingredients {
+                let cals = Int(round(Double(ing.calories) * ing.quantity * factor))
+                let p = (ing.protein ?? 0) * ing.quantity * factor
+                let c = (ing.carbs ?? 0) * ing.quantity * factor
+                let f = (ing.fat ?? 0) * ing.quantity * factor
+
                 let entry = FoodEntry(
-                    name: ingredient.name,
-                    calories: scaledCalories,
-                    protein: scaledProtein > 0 ? scaledProtein : nil,
-                    carbs: scaledCarbs > 0 ? scaledCarbs : nil,
-                    fat: scaledFat > 0 ? scaledFat : nil,
-                    servingSize: ingredient.servingSize,
-                    servingUnit: ingredient.servingUnit,
+                    name: ing.name,
+                    calories: cals,
+                    protein: p > 0 ? p : nil,
+                    carbs: c > 0 ? c : nil,
+                    fat: f > 0 ? f : nil,
+                    servingSize: ing.servingSize,
+                    servingUnit: ing.servingUnit,
                     date: selectedDate,
-                    timestamp: timestamp,
+                    timestamp: ts,
                     source: "Meal: \(meal.name)",
                     externalId: nil
                 )
-                
                 modelContext.insert(entry)
             }
         } else {
-            // Log as single combined meal entry
-            let nutrition = portionNutrition
-            
+            let n = portionNutrition
             let entry = FoodEntry(
                 name: meal.name,
-                calories: Int(round(nutrition.calories)),
-                protein: nutrition.protein,
-                carbs: nutrition.carbs,
-                fat: nutrition.fat,
+                calories: Int(round(n.calories)),
+                protein: n.protein,
+                carbs: n.carbs,
+                fat: n.fat,
                 servingSize: portionGrams,
                 servingUnit: "g",
                 date: selectedDate,
-                timestamp: timestamp,
+                timestamp: ts,
                 source: "Meal",
                 externalId: nil
             )
-            
             modelContext.insert(entry)
         }
-        
-        // Update meal's last used date
+
         meal.lastUsedAt = Date()
-        
         do {
             try modelContext.save()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
             print("Error logging meal portion: \(error)")
         }
-    }
-}
-
-// MARK: - Supporting Views
-struct NutritionMiniCard: View {
-    let icon: String
-    let color: Color
-    let value: String
-    let unit: String
-    let label: String
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // Value at top, centered
-            VStack(spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(value)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
-                    Text(unit)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-            }
-            
-            // Icon and label at bottom
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                    .font(.caption)
-                
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(uiColor: .systemBackground))
-        )
     }
 }
