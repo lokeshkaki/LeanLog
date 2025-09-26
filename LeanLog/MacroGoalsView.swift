@@ -34,7 +34,7 @@ struct MacroGoalsView: View {
                     Text("\(totalCalories) / \(calorieGoal)")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundStyle(AppTheme.secondary)
+                        .foregroundStyle(AppTheme.secondaryText)
                 }
                 
                 ProgressView(value: Double(totalCalories), total: Double(calorieGoal))
@@ -48,7 +48,7 @@ struct MacroGoalsView: View {
                 HStack {
                     Text("Remaining: \(max(0, calorieGoal - totalCalories)) kcal")
                         .font(.caption)
-                        .foregroundStyle(AppTheme.secondary)
+                        .foregroundStyle(AppTheme.secondaryText)
                     Spacer()
                     if totalCalories > calorieGoal {
                         Text("Over by \(totalCalories - calorieGoal) kcal")
@@ -116,7 +116,7 @@ struct MacroProgressCard: View {
             
             Text(title)
                 .font(.caption2)
-                .foregroundStyle(AppTheme.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
             
             VStack(spacing: 4) {
                 Text(String(format: "%.1f", current))
@@ -126,7 +126,7 @@ struct MacroProgressCard: View {
                 
                 Text("/ \(String(format: "%.0f", goal))")
                     .font(.caption2)
-                    .foregroundStyle(AppTheme.tertiary)
+                    .foregroundStyle(AppTheme.tertiaryText)
             }
             
             ProgressView(value: current, total: goal)
@@ -135,7 +135,7 @@ struct MacroProgressCard: View {
             
             Text("\(String(format: "%.0f", max(0, goal - current)))\(unit) left")
                 .font(.caption2)
-                .foregroundStyle(AppTheme.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)

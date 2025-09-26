@@ -96,7 +96,7 @@ struct StatCard: View {
             
             Text("Daily Avg")
                 .font(.caption)
-                .foregroundStyle(AppTheme.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
             
             HStack(alignment: .bottom, spacing: 2) {
@@ -107,7 +107,7 @@ struct StatCard: View {
                 
                 Text(macroUnit)
                     .font(.caption)
-                    .foregroundStyle(AppTheme.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                     .padding(.bottom, 2)
             }
         }
