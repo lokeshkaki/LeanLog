@@ -3,11 +3,12 @@
 //  LeanLog
 //
 //  Created by Lokesh Kaki on 9/22/25.
-//  Updated: Prominent meal header (title + subtitle stack), compact meta chips, slim paddings
+//  Updated: Prominent meal header + consistent keyboard styling + transparent accessory
 //
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct LogMealView: View {
     @Environment(\.dismiss) private var dismiss
@@ -49,28 +50,34 @@ struct LogMealView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
-                    mealInfoSection
-                        .modernCard(elevated: true)
-
-                    portionCard
-                        .modernCard()
-
-                    nutritionCard
-                        .modernCard()
-
-                    logSettingsCard
-                        .modernCard()
-
-                    logButton
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+                        mealInfoSection.modernCard(elevated: true)
+                        portionCard.modernCard()
+                        nutritionCard.modernCard()
+                        logSettingsCard.modernCard()
+                        logButton
+                        Spacer(minLength: 40)
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                    .padding(.top, AppTheme.Spacing.xl)
                 }
-                .padding(.horizontal, AppTheme.Spacing.screenPadding)
-                .padding(.top, AppTheme.Spacing.xl)
+                // Handle any potential keyboard interactions and apply transparent styling
+                .onChange(of: focusedField) { _ in scrollFocusedIntoView(proxy) }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                    scrollFocusedIntoView(proxy)
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
             }
             .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .modernNavigation()
+            .tint(AppTheme.Colors.accent)
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Log Meal")
@@ -83,6 +90,19 @@ struct LogMealView: View {
                             .imageScale(.medium)
                     }
                     .accessibilityLabel("Cancel")
+                }
+                // Keyboard toolbar with checkmark (for any potential text input)
+                ToolbarItemGroup(placement: .keyboard) {
+                    if focusedField != nil {
+                        Spacer()
+                        Button(action: { focusedField = nil }) {
+                            Image(systemName: "checkmark")
+                                .imageScale(.medium)
+                                .fontWeight(.semibold)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Done editing")
+                    }
                 }
             }
         }
@@ -224,6 +244,7 @@ struct LogMealView: View {
 
                                 if idx < meal.ingredients.count - 1 {
                                     Divider()
+                                        .background(AppTheme.Colors.subtleStroke)
                                 }
                             }
                         }
@@ -254,16 +275,21 @@ struct LogMealView: View {
             }
 
             VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                Text("That’s \(String(format: "%.1f", portionPercentage))% of the total meal")
+                Text("That's \(String(format: "%.1f", portionPercentage))% of the total meal")
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(AppTheme.Colors.labelTertiary)
 
                 VStack(spacing: AppTheme.Spacing.sm) {
                     Slider(value: $portionGrams, in: 10...max(10, meal.totalYieldGrams), step: 5)
+                        .tint(AppTheme.Colors.accent)
                     HStack {
-                        Text("10g").font(AppTheme.Typography.caption2).foregroundStyle(AppTheme.Colors.labelTertiary)
+                        Text("10g")
+                            .font(AppTheme.Typography.caption2)
+                            .foregroundStyle(AppTheme.Colors.labelTertiary)
                         Spacer()
-                        Text("\(Int(meal.totalYieldGrams))g").font(AppTheme.Typography.caption2).foregroundStyle(AppTheme.Colors.labelTertiary)
+                        Text("\(Int(meal.totalYieldGrams))g")
+                            .font(AppTheme.Typography.caption2)
+                            .foregroundStyle(AppTheme.Colors.labelTertiary)
                     }
                 }
             }
@@ -404,6 +430,16 @@ struct LogMealView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(RoundedRectangle(cornerRadius: 16).fill(AppTheme.Colors.accentGradient))
+        }
+    }
+
+    // MARK: - Scroll helper
+
+    private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
+        guard let field = focusedField else { return }
+        withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
         }
     }
 

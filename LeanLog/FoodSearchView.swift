@@ -3,10 +3,12 @@
 //  LeanLog
 //
 //  Created by Lokesh Kaki on 9/21/25.
+//  Updated: Consistent navigation styling and keyboard toolbar improvements
 //
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct FoodSearchView: View {
     @Environment(\.dismiss) private var dismiss
@@ -33,12 +35,13 @@ struct FoodSearchView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.description)
-                                    .font(.body)
+                                    .font(AppTheme.Typography.body)
+                                    .foregroundStyle(AppTheme.Colors.labelPrimary)
                                     .lineLimit(2)
                                 if let brand = item.brandName {
                                     Text(brand)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(AppTheme.Typography.caption)
+                                        .foregroundStyle(AppTheme.Colors.labelSecondary)
                                 }
                             }
                         }
@@ -52,16 +55,22 @@ struct FoodSearchView: View {
                 
                 if let error {
                     Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
+                        .foregroundStyle(AppTheme.Colors.destructive)
+                        .font(AppTheme.Typography.caption)
                         .padding()
                 }
             }
+            .screenBackground()
             .navigationTitle("Search Foods")
-            .navigationBarTitleDisplayMode(.inline) // Prevents navigation bar resizing
+            .navigationBarTitleDisplayMode(.inline)
+            .modernNavigation()
+            .tint(AppTheme.Colors.accent)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    }
+                    .accessibilityLabel("Close")
                 }
             }
         }
@@ -145,15 +154,21 @@ struct FoodDetailResultView: View {
     @State private var isLoading = false
     @State private var error: String?
 
+    @FocusState private var focusedField: Field?
+    enum Field: Hashable { case quantity }
+
+    // Locale-aware number IO
+    private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if isLoading {
                     VStack {
                         ProgressView("Loading nutrition info…")
                         Text("Getting food data from USDA...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(AppTheme.Typography.caption)
+                            .foregroundStyle(AppTheme.Colors.labelSecondary)
                             .padding(.top)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -174,11 +189,32 @@ struct FoodDetailResultView: View {
                     ContentUnavailableView("No Data", systemImage: "questionmark.circle")
                 }
             }
+            .screenBackground()
             .navigationTitle("Food Details")
             .navigationBarTitleDisplayMode(.large)
+            .modernNavigation()
+            .tint(AppTheme.Colors.accent)
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    }
+                    .accessibilityLabel("Close")
+                }
+                
+                // Keyboard toolbar for quantity field
+                ToolbarItemGroup(placement: .keyboard) {
+                    if focusedField != nil {
+                        Spacer()
+                        Button(action: { focusedField = nil }) {
+                            Image(systemName: "checkmark")
+                                .imageScale(.medium)
+                                .fontWeight(.semibold)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Done editing")
+                    }
                 }
             }
         }
@@ -187,6 +223,12 @@ struct FoodDetailResultView: View {
         }
         .refreshable {
             await loadDetail()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            KeyboardAccessoryStyler.shared.makeTransparent()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+            KeyboardAccessoryStyler.shared.makeTransparent()
         }
     }
     
@@ -198,13 +240,14 @@ struct FoodDetailResultView: View {
             Section("Nutrition Information") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(detail.description ?? "Food")
-                        .font(.headline)
+                        .font(AppTheme.Typography.headline)
+                        .foregroundStyle(AppTheme.Colors.labelPrimary)
                         .padding(.bottom, 4)
                     
                     if let brand = detail.brandOwner {
                         Text(brand)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(AppTheme.Typography.subheadline)
+                            .foregroundStyle(AppTheme.Colors.labelSecondary)
                     }
                 }
                 
@@ -223,9 +266,13 @@ struct FoodDetailResultView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Quantity:")
+                            .font(AppTheme.Typography.body)
+                            .foregroundStyle(AppTheme.Colors.labelPrimary)
                         Spacer()
                         Text(String(format: "%.2f×", qty))
+                            .font(AppTheme.Typography.body)
                             .fontWeight(.medium)
+                            .foregroundStyle(AppTheme.Colors.labelPrimary)
                     }
                     
                     Stepper("", value: $qty, in: 0.25...10, step: 0.25)
@@ -239,18 +286,20 @@ struct FoodDetailResultView: View {
                     HStack {
                         Image(systemName: "plus.circle.fill")
                         Text("Log to LeanLog")
+                            .font(AppTheme.Typography.bodyEmphasized)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(AppTheme.Colors.accent)
                 
                 // Show calculated values
                 if qty != 1.0 {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Your portion:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(AppTheme.Typography.caption)
+                            .foregroundStyle(AppTheme.Colors.labelSecondary)
                         HStack {
                             Text("\(Int(round(Double(macros.kcal) * qty))) kcal")
                             Text("•")
@@ -260,23 +309,27 @@ struct FoodDetailResultView: View {
                             Text("•")
                             Text("F: \(String(format: "%.1f", macros.fat * qty))g")
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Colors.labelSecondary)
                     }
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.Colors.background)
     }
     
     @ViewBuilder
     private func nutritionRow(label: String, value: String, isHighlight: Bool = false) -> some View {
         HStack {
             Text(label)
-                .foregroundStyle(isHighlight ? .primary : .secondary)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(isHighlight ? AppTheme.Colors.labelPrimary : AppTheme.Colors.labelSecondary)
             Spacer()
             Text(value)
+                .font(AppTheme.Typography.body)
                 .fontWeight(isHighlight ? .semibold : .regular)
-                .foregroundStyle(isHighlight ? .primary : .primary)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
         }
     }
 
@@ -321,10 +374,64 @@ struct FoodDetailResultView: View {
             modelContext.insert(entry)
             try modelContext.save()
             print("Successfully logged food: \(entry.name)")
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         } catch {
             print("Error saving food entry: \(error)")
             self.error = "Failed to save food entry"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
+    }
+}
+
+// MARK: - Locale-aware number IO helper
+
+private struct LocalizedNumberIO {
+    private let formatter: NumberFormatter
+
+    init(maxFractionDigits: Int = 2, locale: Locale = .current) {
+        let nf = NumberFormatter()
+        nf.locale = locale
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = maxFractionDigits
+        nf.usesGroupingSeparator = false
+        self.formatter = nf
+    }
+
+    private var decimalSeparator: String {
+        formatter.decimalSeparator ?? "."
+    }
+
+    func parseDecimal(_ s: String) -> Double? {
+        guard !s.isEmpty else { return nil }
+        return formatter.number(from: s)?.doubleValue
+    }
+
+    func sanitizeDecimal(_ s: String) -> String {
+        guard !s.isEmpty else { return s }
+        let sep = decimalSeparator
+        var out = ""
+        var seenSep = false
+        for ch in s {
+            if ch.isNumber {
+                out.append(ch)
+            } else if String(ch) == sep, !seenSep {
+                out.append(ch)
+                seenSep = true
+            }
+        }
+        if out.hasPrefix(sep) { out = "0" + out }
+        if let range = out.range(of: sep) {
+            let fractional = out[range.upperBound...]
+            if fractional.count > formatter.maximumFractionDigits {
+                let allowed = fractional.prefix(formatter.maximumFractionDigits)
+                out = String(out[..<range.upperBound]) + allowed
+            }
+        }
+        return out
+    }
+
+    func sanitizeInteger(_ s: String) -> String {
+        s.filter { $0.isNumber }
     }
 }

@@ -4,12 +4,13 @@
 //
 //  Created by Lokesh Kaki on 9/22/25.
 //  Updated: Themed cards, predicate-based querying, consistent toolbar, modern empty state
-//           Unified keyboard accessory for search (clear Done bar)
-//           Added Edit Meal entry points (swipe, context menu, and sheet)
+//           Native keyboard toolbar (checkmark) for search + QuickType + transparent accessory
+//           Autosave-friendly mutations (no explicit saves)
 //
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct MealsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -22,45 +23,55 @@ struct MealsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
-                    // Search field sits under the title for symmetry with Home
-                    SearchBar(
-                        text: $searchText,
-                        placeholder: "Search meals…",
-                        isFocused: $searchFocused
-                    )
-                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
-                    .padding(.top, AppTheme.Spacing.xl)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+                        // Search field sits under the title for symmetry with Home
+                        SearchBar(
+                            text: $searchText,
+                            placeholder: "Search meals…",
+                            isFocused: $searchFocused
+                        )
+                        .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                        .padding(.top, AppTheme.Spacing.xl)
+                        .id("search")
 
-                    MealsContent(
-                        searchText: searchText,
-                        onLog: { showingLogMeal = $0 },
-                        onFavorite: toggleFavorite(_:),
-                        onDelete: deleteMeal(_:),
-                        onEdit: { showingEditMeal = $0 },
-                        onCreateFirst: { showingCreateMeal = true }
-                    )
-                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                        MealsContent(
+                            searchText: searchText,
+                            onLog: { showingLogMeal = $0 },
+                            onFavorite: toggleFavorite(_:),
+                            onDelete: deleteMeal(_:),
+                            onEdit: { showingEditMeal = $0 },
+                            onCreateFirst: { showingCreateMeal = true }
+                        )
+                        .padding(.horizontal, AppTheme.Spacing.screenPadding)
 
-                    Spacer(minLength: 60)
+                        Spacer(minLength: 60)
+                    }
+                }
+                // Keep search field visible and apply transparent styling
+                .onChange(of: searchFocused) { _ in scrollSearchIntoView(proxy) }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                    scrollSearchIntoView(proxy)
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                    KeyboardAccessoryStyler.shared.makeTransparent()
                 }
             }
             .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .modernNavigation()
-            // Show the unified clear accessory with Done for the search field
-            .keyboardAccessory(
-                focusedField: binding($searchFocused),
-                equals: true,
-                config: .done { searchFocused = nil }
-            )
+            .tint(AppTheme.Colors.accent)
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
+                // Title
                 ToolbarItem(placement: .principal) {
                     Text("Meals")
                         .font(AppTheme.Typography.title3)
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
+                // Create button
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingCreateMeal = true } label: {
                         Image(systemName: AppTheme.Icons.add)
@@ -69,6 +80,19 @@ struct MealsView: View {
                             .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel("Create meal")
+                }
+                // Native keyboard toolbar for search (checkmark instead of "Done")
+                ToolbarItemGroup(placement: .keyboard) {
+                    if searchFocused == true {
+                        Spacer()
+                        Button(action: { searchFocused = nil }) {
+                            Image(systemName: "checkmark")
+                                .imageScale(.medium)
+                                .fontWeight(.semibold)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Done editing")
+                    }
                 }
             }
             .sheet(isPresented: $showingCreateMeal) {
@@ -83,15 +107,31 @@ struct MealsView: View {
         }
     }
 
-    // MARK: - Mutations
+    // MARK: - Helper
+
+    private func scrollSearchIntoView(_ proxy: ScrollViewProxy) {
+        if searchFocused == true {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo("search", anchor: .top)
+            }
+            DispatchQueue.main.async {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo("search", anchor: .top)
+                }
+            }
+        }
+    }
+
+    // MARK: - Mutations (autosave-friendly)
+
     private func toggleFavorite(_ meal: Meal) {
         meal.isFavorite.toggle()
-        try? modelContext.save()
+        // Rely on SwiftData autosave
     }
 
     private func deleteMeal(_ meal: Meal) {
         modelContext.delete(meal)
-        try? modelContext.save()
+        // Rely on SwiftData autosave
     }
 }
 
@@ -335,8 +375,11 @@ private struct SearchBar: View {
                 .foregroundStyle(AppTheme.Colors.labelTertiary)
             TextField(placeholder, text: $text)
                 .textInputAutocapitalization(.words)
-                .disableAutocorrection(true)
+                .autocorrectionDisabled(false)   // Keep QuickType for search
+                .keyboardType(.default)
                 .focused(isFocused, equals: true)
+                .submitLabel(.done)
+                .foregroundStyle(AppTheme.Colors.labelPrimary)
         }
         .modernField()
     }
