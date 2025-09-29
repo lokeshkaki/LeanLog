@@ -2,12 +2,14 @@
 //  CreateMealView.swift
 //  LeanLog
 //
-//  Created by Lokesh Kaki on 9/22/25.
-//  Updated: Unified keyboard accessory — Done appears on meal name and total yield; no system tick/return
+//  Updated: Single native keyboard toolbar (Prev/Next/Done) with plain buttons
+//  + QuickType on meal name
+//  + Transparent accessory background via KeyboardAccessoryStyler
 //
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct CreateMealView: View {
     @Environment(\.dismiss) private var dismiss
@@ -19,55 +21,82 @@ struct CreateMealView: View {
     @State private var showingAddIngredient = false
 
     @FocusState private var focusedField: Field?
+    enum Field: Hashable { case mealName, totalYield }
 
-    enum Field: Hashable {
-        case mealName, totalYield
-    }
+    // Locale-aware number IO
+    private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
 
-    private var isValidMeal: Bool {
+    private var isValid: Bool {
         !mealName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         Double(totalYieldGrams) ?? 0 > 0 &&
         !ingredients.isEmpty
     }
 
+    private var orderedFields: [Field] { [.mealName, .totalYield] }
+    private var focusedIndex: Int? { focusedField.flatMap { orderedFields.firstIndex(of: $0) } }
+    private var canGoPrev: Bool { (focusedIndex ?? 0) > 0 }
+    private var canGoNext: Bool { (focusedIndex ?? (orderedFields.count - 1)) < orderedFields.count - 1 }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
-                    mealNameCard
-                        .modernCard()
-
-                    ingredientsCard
-                        .modernCard()
-
-                    if !ingredients.isEmpty {
-                        nutritionCard
-                            .modernCard(elevated: true)
-
-                        totalYieldCard
-                            .modernCard()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+                        mealNameCard.modernCard()
+                        ingredientsCard.modernCard()
+                        if !ingredients.isEmpty {
+                            nutritionCard.modernCard(elevated: true)
+                            totalYieldCard.modernCard()
+                        }
+                        Spacer(minLength: 40)
                     }
-
-                    Spacer(minLength: 40)
+                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                    .padding(.top, AppTheme.Spacing.xl)
                 }
-                .padding(.horizontal, AppTheme.Spacing.screenPadding)
-                .padding(.top, AppTheme.Spacing.xl)
+                // Keep the focused input visible and re-apply transparent styling as keyboard moves
+                .onChange(of: focusedField) { _ in scrollFocusedIntoView(proxy) }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                    scrollFocusedIntoView(proxy)
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
             }
             .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .modernNavigation()
-            // Unified clear accessory on both fields
-            .keyboardAccessory(
-                focusedField: binding($focusedField),
-                equals: .mealName,
-                config: .done { focusedField = nil }
-            )
-            .keyboardAccessory(
-                focusedField: binding($focusedField),
-                equals: .totalYield,
-                config: .done { focusedField = nil }
-            )
+            .tint(AppTheme.Colors.accent)
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
+                // One native keyboard toolbar with plain buttons (system look)
+                ToolbarItemGroup(placement: .keyboard) {
+                    if focusedField != nil {
+                        Button(action: previousField) {
+                            Image(systemName: "chevron.up").imageScale(.medium)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canGoPrev)
+                        .accessibilityLabel("Previous field")
+
+                        Button(action: nextField) {
+                            Image(systemName: "chevron.down").imageScale(.medium)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canGoNext)
+                        .accessibilityLabel("Next field")
+
+                        Spacer()
+
+                        Button(action: { focusedField = nil }) {
+                            Image(systemName: "checkmark")
+                                .imageScale(.medium)
+                                .fontWeight(.semibold)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Done editing")
+                    }
+                }
                 ToolbarItem(placement: .principal) {
                     Text("Create Meal")
                         .font(AppTheme.Typography.title3)
@@ -75,18 +104,16 @@ struct CreateMealView: View {
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
-                        Image(systemName: AppTheme.Icons.close)
-                            .imageScale(.medium)
+                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
                     }
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: saveMeal) {
-                        Image(systemName: AppTheme.Icons.save)
-                            .symbolRenderingMode(.hierarchical)
+                        Image(systemName: AppTheme.Icons.save).symbolRenderingMode(.hierarchical)
                     }
-                    .disabled(!isValidMeal)
-                    .opacity(isValidMeal ? 1 : 0.4)
+                    .disabled(!isValid)
+                    .opacity(isValid ? 1 : 0.4)
                     .accessibilityLabel("Save")
                 }
             }
@@ -105,17 +132,19 @@ struct CreateMealView: View {
             Text("Meal name")
                 .font(AppTheme.Typography.headline)
                 .foregroundStyle(AppTheme.Colors.labelPrimary)
-
             HStack(spacing: AppTheme.Spacing.md) {
-                Image(systemName: "text.cursor")
-                    .foregroundStyle(AppTheme.Colors.labelTertiary)
+                Image(systemName: "text.cursor").foregroundStyle(AppTheme.Colors.labelTertiary)
                 TextField("e.g., Chicken Rice Bowl", text: $mealName)
                     .textInputAutocapitalization(.words)
-                    .disableAutocorrection(true)
+                    .autocorrectionDisabled(false)   // Keep QuickType for name
+                    .keyboardType(.default)
                     .focused($focusedField, equals: .mealName)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .totalYield }
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
             }
             .modernField(focused: focusedField == .mealName)
+            .id(Field.mealName)
         }
     }
 
@@ -136,8 +165,7 @@ struct CreateMealView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: AppTheme.Icons.add)
-                        Text("Add")
-                            .font(AppTheme.Typography.bodyEmphasized)
+                        Text("Add").font(AppTheme.Typography.bodyEmphasized)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -176,45 +204,19 @@ struct CreateMealView: View {
                     .foregroundStyle(AppTheme.Colors.labelTertiary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(
-                        Capsule().fill(AppTheme.Colors.input)
-                    )
+                    .background(Capsule().fill(AppTheme.Colors.input))
             }
 
             let totals = totalsForMeal()
 
             VStack(spacing: AppTheme.Spacing.lg) {
                 HStack(spacing: AppTheme.Spacing.lg) {
-                    NutritionMiniCard(
-                        icon: AppTheme.Icons.calories,
-                        color: AppTheme.Colors.calories,
-                        value: "\(Int(round(totals.calories)))",
-                        unit: "kcal",
-                        label: "Calories"
-                    )
-                    NutritionMiniCard(
-                        icon: AppTheme.Icons.protein,
-                        color: AppTheme.Colors.protein,
-                        value: String(format: "%.1f", totals.protein),
-                        unit: "g",
-                        label: "Protein"
-                    )
+                    NutritionMiniCard(icon: AppTheme.Icons.calories, color: AppTheme.Colors.calories, value: "\(Int(round(totals.calories)))", unit: "kcal", label: "Calories")
+                    NutritionMiniCard(icon: AppTheme.Icons.protein, color: AppTheme.Colors.protein, value: String(format: "%.1f", totals.protein), unit: "g", label: "Protein")
                 }
                 HStack(spacing: AppTheme.Spacing.lg) {
-                    NutritionMiniCard(
-                        icon: AppTheme.Icons.carbs,
-                        color: AppTheme.Colors.carbs,
-                        value: String(format: "%.1f", totals.carbs),
-                        unit: "g",
-                        label: "Carbs"
-                    )
-                    NutritionMiniCard(
-                        icon: AppTheme.Icons.fat,
-                        color: AppTheme.Colors.fat,
-                        value: String(format: "%.1f", totals.fat),
-                        unit: "g",
-                        label: "Fat"
-                    )
+                    NutritionMiniCard(icon: AppTheme.Icons.carbs, color: AppTheme.Colors.carbs, value: String(format: "%.1f", totals.carbs), unit: "g", label: "Carbs")
+                    NutritionMiniCard(icon: AppTheme.Icons.fat, color: AppTheme.Colors.fat, value: String(format: "%.1f", totals.fat), unit: "g", label: "Fat")
                 }
             }
         }
@@ -225,26 +227,24 @@ struct CreateMealView: View {
             Text("Total yield")
                 .font(AppTheme.Typography.headline)
                 .foregroundStyle(AppTheme.Colors.labelPrimary)
-
             HStack(spacing: AppTheme.Spacing.md) {
                 HStack(spacing: AppTheme.Spacing.md) {
-                    Image(systemName: "scalemass")
-                        .foregroundStyle(AppTheme.Colors.labelTertiary)
+                    Image(systemName: "scalemass").foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Enter weight", text: $totalYieldGrams)
-                        .keyboardType(.numberPad)
+                        .keyboardType(.decimalPad)
                         .focused($focusedField, equals: .totalYield)
+                        .submitLabel(.done)
+                        .onSubmit { focusedField = nil }
+                        .onChange(of: totalYieldGrams) { totalYieldGrams = numberIO.sanitizeDecimal(totalYieldGrams) }
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 .modernField(focused: focusedField == .totalYield)
+                .id(Field.totalYield)
 
                 Text("grams")
                     .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.Colors.labelSecondary)
             }
-
-            Text("Enter the total weight after cooking/preparation.")
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Colors.labelTertiary)
         }
     }
 
@@ -258,21 +258,29 @@ struct CreateMealView: View {
         return (calories, protein, carbs, fat)
     }
 
-    private func saveMeal() {
-        guard isValidMeal, let yieldGrams = Double(totalYieldGrams) else { return }
+    private func nextField() {
+        guard let current = focusedField, let idx = orderedFields.firstIndex(of: current) else { return }
+        focusedField = orderedFields[min(idx + 1, orderedFields.count - 1)]
+    }
 
-        let meal = Meal(
-            name: mealName.trimmingCharacters(in: .whitespacesAndNewlines),
-            totalYieldGrams: yieldGrams
-        )
+    private func previousField() {
+        guard let current = focusedField, let idx = orderedFields.firstIndex(of: current) else { return }
+        focusedField = orderedFields[max(idx - 1, 0)]
+    }
 
-        for ingredient in ingredients {
-            ingredient.meal = meal
-            meal.ingredients.append(ingredient)
+    private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
+        guard let field = focusedField else { return }
+        withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
         }
+    }
 
+    private func saveMeal() {
+        guard isValid, let yield = Double(totalYieldGrams) else { return }
+        let meal = Meal(name: mealName.trimmingCharacters(in: .whitespacesAndNewlines), totalYieldGrams: yield)
+        for ing in ingredients { ing.meal = meal; meal.ingredients.append(ing) }
         modelContext.insert(meal)
-
         do {
             try modelContext.save()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -284,12 +292,10 @@ struct CreateMealView: View {
     }
 }
 
-// MARK: - Ingredient row (themed)
-
+// Shared ingredient row
 private struct IngredientRowCard: View {
     let ingredient: MealIngredient
     let onDelete: () -> Void
-
     var body: some View {
         HStack(alignment: .center, spacing: AppTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: 4) {
@@ -297,17 +303,13 @@ private struct IngredientRowCard: View {
                     .font(AppTheme.Typography.body)
                     .fontWeight(.medium)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
-
                 Text("\(String(format: "%.2g", ingredient.quantity))× serving")
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(AppTheme.Colors.labelTertiary)
             }
-
             Spacer()
-
             Button(role: .destructive, action: onDelete) {
-                Image(systemName: AppTheme.Icons.delete)
-                    .imageScale(.small)
+                Image(systemName: AppTheme.Icons.delete).imageScale(.small)
             }
             .buttonStyle(.borderedProminent)
             .tint(AppTheme.Colors.destructive)
@@ -323,5 +325,57 @@ private struct IngredientRowCard: View {
                         .stroke(AppTheme.Colors.subtleStroke, lineWidth: 1)
                 }
         )
+    }
+}
+
+// MARK: - Locale-aware number IO helper
+
+private struct LocalizedNumberIO {
+    private let formatter: NumberFormatter
+
+    init(maxFractionDigits: Int = 2, locale: Locale = .current) {
+        let nf = NumberFormatter()
+        nf.locale = locale
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = maxFractionDigits
+        nf.usesGroupingSeparator = false
+        self.formatter = nf
+    }
+
+    private var decimalSeparator: String {
+        formatter.decimalSeparator ?? "."
+    }
+
+    func parseDecimal(_ s: String) -> Double? {
+        guard !s.isEmpty else { return nil }
+        return formatter.number(from: s)?.doubleValue
+    }
+
+    func sanitizeDecimal(_ s: String) -> String {
+        guard !s.isEmpty else { return s }
+        let sep = decimalSeparator
+        var out = ""
+        var seenSep = false
+        for ch in s {
+            if ch.isNumber {
+                out.append(ch)
+            } else if String(ch) == sep, !seenSep {
+                out.append(ch)
+                seenSep = true
+            }
+        }
+        if out.hasPrefix(sep) { out = "0" + out }
+        if let range = out.range(of: sep) {
+            let fractional = out[range.upperBound...]
+            if fractional.count > formatter.maximumFractionDigits {
+                let allowed = fractional.prefix(formatter.maximumFractionDigits)
+                out = String(out[..<range.upperBound]) + allowed
+            }
+        }
+        return out
+    }
+
+    func sanitizeInteger(_ s: String) -> String {
+        s.filter { $0.isNumber }
     }
 }

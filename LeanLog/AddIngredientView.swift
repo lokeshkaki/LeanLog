@@ -5,11 +5,13 @@
 //  Clean flow: No redundant Quantity (use serving size + unit).
 //  Prominent system segmented control (large) under the title.
 //  Manual uses AddFood-style macro grid with in-field units.
-//  System keyboard toolbar “Done” for all inputs.
+//  System keyboard toolbar "Done" for all inputs.
+//  Native keyboard toolbar + QuickType + transparent accessory background.
 //
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct AddIngredientView: View {
     @Environment(\.dismiss) private var dismiss
@@ -34,7 +36,7 @@ struct AddIngredientView: View {
     @State private var servingUnit = ""
 
     @FocusState private var focused: ManualField?
-    enum ManualField { case name, size, unit, cals, prot, carbs, fat }
+    enum ManualField: Hashable { case name, size, unit, cals, prot, carbs, fat }
 
     // Search
     @State private var query = ""
@@ -47,53 +49,70 @@ struct AddIngredientView: View {
     @Query(sort: [SortDescriptor(\FoodEntry.timestamp, order: .reverse)])
     private var allEntries: [FoodEntry]
 
+    // Locale-aware number IO
+    private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
+
     private var isManualValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         Int(calories) != nil
     }
 
+    private var manualFieldOrder: [ManualField] { [.name, .size, .unit, .cals, .prot, .carbs, .fat] }
+    private var focusedIndex: Int? { focused.flatMap { manualFieldOrder.firstIndex(of: $0) } }
+    private var canGoPrev: Bool { (focusedIndex ?? 0) > 0 }
+    private var canGoNext: Bool { (focusedIndex ?? (manualFieldOrder.count - 1)) < manualFieldOrder.count - 1 }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: AppTheme.Spacing.sectionSpacing) {
 
-                    // Prominent large segmented tabs (no wrapping)
-                    Picker("", selection: $mode) {
-                        ForEach(Mode.allCases) { m in
-                            Text(m.rawValue)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.9)
-                                .tag(m)
+                        // Prominent large segmented tabs (no wrapping)
+                        Picker("", selection: $mode) {
+                            ForEach(Mode.allCases) { m in
+                                Text(m.rawValue)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.9)
+                                    .tag(m)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .controlSize(.large)
+                        .tint(AppTheme.Colors.accent)
+
+                        Group {
+                            switch mode {
+                            case .search:
+                                searchCard.modernCard()
+                                searchResultsList
+                            case .manual:
+                                manualDetailsCard.modernCard()
+                                manualNutritionCard.modernCard()
+                                addButton // CTA outside card
+                            case .recent:
+                                recentList
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .controlSize(.large)
-                    .tint(AppTheme.Colors.accent)
-
-                    Group {
-                        switch mode {
-                        case .search:
-                            searchCard
-                                .modernCard()
-                            searchResultsList
-                        case .manual:
-                            manualDetailsCard
-                                .modernCard()
-                            manualNutritionCard
-                                .modernCard()
-                            addButton // CTA outside card
-                        case .recent:
-                            recentList
-                        }
-                    }
+                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                    .padding(.top, AppTheme.Spacing.xl)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, AppTheme.Spacing.screenPadding)
-                .padding(.top, AppTheme.Spacing.xl)
-                .padding(.bottom, 20)
+                // Keep focused field visible and refresh toolbar styling as keyboard animates
+                .onChange(of: focused) { _ in scrollFocusedIntoView(proxy) }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                    scrollFocusedIntoView(proxy)
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                    KeyboardAccessoryStyler.shared.makeTransparent()
+                }
             }
             .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .modernNavigation()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Add Ingredient")
@@ -107,14 +126,32 @@ struct AddIngredientView: View {
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        focused = nil
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    if focused != nil {
+                        Button(action: previousField) {
+                            Image(systemName: "chevron.up").imageScale(.medium)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canGoPrev)
+                        .accessibilityLabel("Previous field")
+
+                        Button(action: nextField) {
+                            Image(systemName: "chevron.down").imageScale(.medium)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canGoNext)
+                        .accessibilityLabel("Next field")
+
+                        Spacer()
+
+                        // Use checkmark icon instead of "Done" text to save space
+                        Button(action: { focused = nil }) {
+                            Image(systemName: "checkmark")
+                                .imageScale(.medium)
+                                .fontWeight(.semibold)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Done editing")
                     }
-                    .fontWeight(.semibold)
-                    .buttonBorderShape(.capsule)
-                    .buttonStyle(.borderedProminent)
                 }
             }
         }
@@ -132,12 +169,16 @@ struct AddIngredientView: View {
             HStack(spacing: AppTheme.Spacing.md) {
                 Image(systemName: "text.cursor").foregroundStyle(AppTheme.Colors.labelTertiary)
                 TextField("Ingredient name", text: $name)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled(false)   // Keep QuickType for name
+                    .keyboardType(.default)
                     .focused($focused, equals: .name)
                     .submitLabel(.next)
                     .onSubmit { focused = .size }
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
             }
             .modernField(focused: focused == .name)
+            .id(ManualField.name)
 
             HStack(spacing: AppTheme.Spacing.md) {
                 HStack(spacing: AppTheme.Spacing.md) {
@@ -147,18 +188,21 @@ struct AddIngredientView: View {
                         .focused($focused, equals: .size)
                         .submitLabel(.next)
                         .onSubmit { focused = .unit }
+                        .onChange(of: servingSize) { servingSize = numberIO.sanitizeDecimal(servingSize) }
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 .modernField(focused: focused == .size)
+                .id(ManualField.size)
 
                 TextField("Unit (e.g., g, oz)", text: $servingUnit)
                     .textInputAutocapitalization(.never)
-                    .disableAutocorrection(true)
+                    .autocorrectionDisabled(true)
                     .focused($focused, equals: .unit)
                     .submitLabel(.next)
                     .onSubmit { focused = .cals }
                     .modernField(focused: focused == .unit)
                     .frame(maxWidth: 160)
+                    .id(ManualField.unit)
             }
         }
     }
@@ -176,18 +220,20 @@ struct AddIngredientView: View {
 
             LazyVGrid(columns: columns, spacing: AppTheme.Spacing.lg) {
                 macroField(icon: AppTheme.Icons.calories, title: "Calories", unit: "kcal",
-                           color: AppTheme.Colors.calories, text: $calories, field: .cals, keyboard: .numberPad)
+                           color: AppTheme.Colors.calories, text: $calories, field: .cals, keyboard: .numberPad, sanitizer: { numberIO.sanitizeInteger($0) })
+                    .id(ManualField.cals)
                 macroField(icon: AppTheme.Icons.protein,  title: "Protein",  unit: "g",
-                           color: AppTheme.Colors.protein,  text: $protein,  field: .prot, keyboard: .decimalPad)
+                           color: AppTheme.Colors.protein,  text: $protein,  field: .prot, keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
+                    .id(ManualField.prot)
                 macroField(icon: AppTheme.Icons.carbs,    title: "Carbs",    unit: "g",
-                           color: AppTheme.Colors.carbs,    text: $carbs,    field: .carbs, keyboard: .decimalPad)
+                           color: AppTheme.Colors.carbs,    text: $carbs,    field: .carbs, keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
+                    .id(ManualField.carbs)
                 macroField(icon: AppTheme.Icons.fat,      title: "Fat",      unit: "g",
-                           color: AppTheme.Colors.fat,      text: $fat,      field: .fat, keyboard: .decimalPad)
+                           color: AppTheme.Colors.fat,      text: $fat,      field: .fat, keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
+                    .id(ManualField.fat)
             }
         }
     }
-
-    private var manualFieldOrder: [ManualField] { [.name, .size, .unit, .cals, .prot, .carbs, .fat] }
 
     private func advance(from field: ManualField) {
         if let idx = manualFieldOrder.firstIndex(of: field), idx < manualFieldOrder.count - 1 {
@@ -197,13 +243,24 @@ struct AddIngredientView: View {
         }
     }
 
+    private func nextField() {
+        guard let current = focused, let idx = manualFieldOrder.firstIndex(of: current) else { return }
+        focused = manualFieldOrder[min(idx + 1, manualFieldOrder.count - 1)]
+    }
+
+    private func previousField() {
+        guard let current = focused, let idx = manualFieldOrder.firstIndex(of: current) else { return }
+        focused = manualFieldOrder[max(idx - 1, 0)]
+    }
+
     private func macroField(icon: String,
                             title: String,
                             unit: String,
                             color: Color,
                             text: Binding<String>,
                             field: ManualField,
-                            keyboard: UIKeyboardType) -> some View {
+                            keyboard: UIKeyboardType,
+                            sanitizer: @escaping (String) -> String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: AppTheme.Spacing.sm) {
                 Image(systemName: icon)
@@ -223,8 +280,14 @@ struct AddIngredientView: View {
                     .focused($focused, equals: field)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
-                    .submitLabel(.next)
-                    .onSubmit { advance(from: field) }
+                    .submitLabel(field == .fat ? .done : .next)
+                    .onSubmit { field == .fat ? (focused = nil) : advance(from: field) }
+                    .onChange(of: text.wrappedValue) { newValue in
+                        let sanitized = sanitizer(newValue)
+                        if sanitized != newValue {
+                            text.wrappedValue = sanitized
+                        }
+                    }
 
                 Text(unit)
                     .font(AppTheme.Typography.callout)
@@ -264,7 +327,7 @@ struct AddIngredientView: View {
                 Image(systemName: AppTheme.Icons.search).foregroundStyle(AppTheme.Colors.labelTertiary)
                 TextField("Search foods…", text: $query)
                     .textInputAutocapitalization(.words)
-                    .disableAutocorrection(true)
+                    .autocorrectionDisabled(true)
                     .onChange(of: query) { _, _ in debounceSearch() }
             }
             .modernField()
@@ -459,5 +522,71 @@ struct AddIngredientView: View {
         )
         onIngredientAdded(ing)
         dismiss()
+    }
+
+    // MARK: - Keyboard scroll helper
+
+    private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
+        guard let field = focused else { return }
+        withAnimation(.easeOut(duration: 0.25)) {
+            proxy.scrollTo(field, anchor: .bottom)
+        }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(field, anchor: .bottom)
+            }
+        }
+    }
+}
+
+// MARK: - Locale-aware number IO helper
+
+private struct LocalizedNumberIO {
+    private let formatter: NumberFormatter
+
+    init(maxFractionDigits: Int = 2, locale: Locale = .current) {
+        let nf = NumberFormatter()
+        nf.locale = locale
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = maxFractionDigits
+        nf.usesGroupingSeparator = false
+        self.formatter = nf
+    }
+
+    private var decimalSeparator: String {
+        formatter.decimalSeparator ?? "."
+    }
+
+    func parseDecimal(_ s: String) -> Double? {
+        guard !s.isEmpty else { return nil }
+        return formatter.number(from: s)?.doubleValue
+    }
+
+    func sanitizeDecimal(_ s: String) -> String {
+        guard !s.isEmpty else { return s }
+        let sep = decimalSeparator
+        var out = ""
+        var seenSep = false
+        for ch in s {
+            if ch.isNumber {
+                out.append(ch)
+            } else if String(ch) == sep, !seenSep {
+                out.append(ch)
+                seenSep = true
+            }
+        }
+        if out.hasPrefix(sep) { out = "0" + out }
+        if let range = out.range(of: sep) {
+            let fractional = out[range.upperBound...]
+            if fractional.count > formatter.maximumFractionDigits {
+                let allowed = fractional.prefix(formatter.maximumFractionDigits)
+                out = String(out[..<range.upperBound]) + allowed
+            }
+        }
+        return out
+    }
+
+    func sanitizeInteger(_ s: String) -> String {
+        s.filter { $0.isNumber }
     }
 }
