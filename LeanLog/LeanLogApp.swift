@@ -13,7 +13,9 @@ struct LeanLogApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
-                .modelContainer(try! SwiftData.ModelContainer(for: FoodEntry.self, Meal.self))
+                .modelContainer(try! SwiftData.ModelContainer(
+                    for: FoodEntry.self, Meal.self, UserProfile.self
+                ))
         }
     }
 }

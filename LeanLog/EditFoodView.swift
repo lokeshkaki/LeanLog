@@ -3,7 +3,7 @@
 //  LeanLog
 //
 //  Created by Lokesh Kaki on 9/21/25.
-//  Updated: Native keyboard toolbar (Prev/Next/checkmark) + QuickType + transparent accessory
+//  Updated: Simplified - Native keyboard + tap-to-dismiss
 //
 
 import SwiftUI
@@ -28,7 +28,6 @@ struct EditFoodView: View {
 
     @FocusState private var focusedField: Field?
 
-    // Locale-aware number IO
     private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
 
     enum Field: CaseIterable, Hashable {
@@ -58,10 +57,9 @@ struct EditFoodView: View {
         _selectedDate = State(initialValue: entry.date)
     }
 
-    private var orderedFields: [Field] { [.name, .servingSize, .servingUnit, .calories, .protein, .carbs, .fat] }
-    private var focusedIndex: Int? { focusedField.flatMap { orderedFields.firstIndex(of: $0) } }
-    private var canGoPrev: Bool { (focusedIndex ?? 0) > 0 }
-    private var canGoNext: Bool { (focusedIndex ?? (orderedFields.count - 1)) < orderedFields.count - 1 }
+    private var orderedFields: [Field] {
+        [.name, .servingSize, .servingUnit, .calories, .protein, .carbs, .fat]
+    }
 
     var body: some View {
         NavigationStack {
@@ -82,14 +80,12 @@ struct EditFoodView: View {
                     .padding(.horizontal, AppTheme.Spacing.screenPadding)
                     .padding(.top, AppTheme.Spacing.xl)
                 }
-                // Keep focused field visible and apply transparent styling
-                .onChange(of: focusedField) { _ in scrollFocusedIntoView(proxy) }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                    scrollFocusedIntoView(proxy)
-                    KeyboardAccessoryStyler.shared.makeTransparent()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    focusedField = nil
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
-                    KeyboardAccessoryStyler.shared.makeTransparent()
+                .onChange(of: focusedField) { _ in
+                    scrollFocusedIntoView(proxy)
                 }
             }
             .screenBackground()
@@ -99,47 +95,20 @@ struct EditFoodView: View {
             .tint(AppTheme.Colors.accent)
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
-                // Keyboard toolbar: Prev / Next / checkmark (no cutoff issues)
-                ToolbarItemGroup(placement: .keyboard) {
-                    if focusedField != nil {
-                        Button(action: previousField) {
-                            Image(systemName: "chevron.up").imageScale(.medium)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canGoPrev)
-                        .accessibilityLabel("Previous field")
-
-                        Button(action: nextField) {
-                            Image(systemName: "chevron.down").imageScale(.medium)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canGoNext)
-                        .accessibilityLabel("Next field")
-
-                        Spacer()
-
-                        Button(action: { focusedField = nil }) {
-                            Image(systemName: "checkmark")
-                                .imageScale(.medium)
-                                .fontWeight(.semibold)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Done editing")
-                    }
-                }
-
-                // Leading: Cancel
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
+                    Button {
+                        dismiss()
+                    } label: {
                         Image(systemName: AppTheme.Icons.close)
                             .imageScale(.medium)
                     }
                     .accessibilityLabel("Cancel")
                 }
 
-                // Trailing: Delete (icon-only), then Save
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(role: .destructive) { showingDeleteAlert = true } label: {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
                         Image(systemName: AppTheme.Icons.delete)
                             .imageScale(.medium)
                             .foregroundStyle(AppTheme.Colors.destructive)
@@ -158,7 +127,9 @@ struct EditFoodView: View {
                 }
             }
             .alert("Delete Entry", isPresented: $showingDeleteAlert) {
-                Button("Delete", role: .destructive) { deleteEntry() }
+                Button("Delete", role: .destructive) {
+                    deleteEntry()
+                }
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Are you sure you want to delete this food entry? This action cannot be undone.")
@@ -206,7 +177,7 @@ struct EditFoodView: View {
                         .foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Food name", text: $name)
                         .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled(false)   // Keep QuickType for name
+                        .autocorrectionDisabled(false)
                         .keyboardType(.default)
                         .focused($focusedField, equals: .name)
                         .submitLabel(.next)
@@ -242,7 +213,9 @@ struct EditFoodView: View {
                         .focused($focusedField, equals: .servingSize)
                         .submitLabel(.next)
                         .onSubmit { focusedField = .servingUnit }
-                        .onChange(of: servingSize) { servingSize = numberIO.sanitizeDecimal(servingSize) }
+                        .onChange(of: servingSize) { newValue in
+                            servingSize = numberIO.sanitizeDecimal(newValue)
+                        }
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 .modernField(focused: focusedField == .servingSize)
@@ -277,14 +250,53 @@ struct EditFoodView: View {
             ]
 
             LazyVGrid(columns: columns, spacing: AppTheme.Spacing.lg) {
-                macroField(icon: AppTheme.Icons.calories, title: "Calories", unit: "kcal", color: AppTheme.Colors.calories, text: $calories, field: .calories, keyboard: .numberPad, sanitizer: { numberIO.sanitizeInteger($0) })
-                    .id(Field.calories)
-                macroField(icon: AppTheme.Icons.protein,  title: "Protein",  unit: "g",    color: AppTheme.Colors.protein,  text: $protein,  field: .protein,  keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
-                    .id(Field.protein)
-                macroField(icon: AppTheme.Icons.carbs,    title: "Carbs",    unit: "g",    color: AppTheme.Colors.carbs,    text: $carbs,    field: .carbs,    keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
-                    .id(Field.carbs)
-                macroField(icon: AppTheme.Icons.fat,      title: "Fat",      unit: "g",    color: AppTheme.Colors.fat,      text: $fat,      field: .fat,      keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
-                    .id(Field.fat)
+                macroField(
+                    icon: AppTheme.Icons.calories,
+                    title: "Calories",
+                    unit: "kcal",
+                    color: AppTheme.Colors.calories,
+                    text: $calories,
+                    field: .calories,
+                    keyboard: .numberPad,
+                    sanitizer: { numberIO.sanitizeInteger($0) }
+                )
+                .id(Field.calories)
+
+                macroField(
+                    icon: AppTheme.Icons.protein,
+                    title: "Protein",
+                    unit: "g",
+                    color: AppTheme.Colors.protein,
+                    text: $protein,
+                    field: .protein,
+                    keyboard: .decimalPad,
+                    sanitizer: { numberIO.sanitizeDecimal($0) }
+                )
+                .id(Field.protein)
+
+                macroField(
+                    icon: AppTheme.Icons.carbs,
+                    title: "Carbs",
+                    unit: "g",
+                    color: AppTheme.Colors.carbs,
+                    text: $carbs,
+                    field: .carbs,
+                    keyboard: .decimalPad,
+                    sanitizer: { numberIO.sanitizeDecimal($0) }
+                )
+                .id(Field.carbs)
+
+                macroField(
+                    icon: AppTheme.Icons.fat,
+                    title: "Fat",
+                    unit: "g",
+                    color: AppTheme.Colors.fat,
+                    text: $fat,
+                    field: .fat,
+                    keyboard: .decimalPad,
+                    sanitizer: { numberIO.sanitizeDecimal($0) }
+                )
+                .id(Field.fat)
             }
 
             if calories.isEmpty && (!protein.isEmpty || !carbs.isEmpty || !fat.isEmpty) {
@@ -295,7 +307,16 @@ struct EditFoodView: View {
         }
     }
 
-    private func macroField(icon: String, title: String, unit: String, color: Color, text: Binding<String>, field: Field, keyboard: UIKeyboardType, sanitizer: @escaping (String) -> String) -> some View {
+    private func macroField(
+        icon: String,
+        title: String,
+        unit: String,
+        color: Color,
+        text: Binding<String>,
+        field: Field,
+        keyboard: UIKeyboardType,
+        sanitizer: @escaping (String) -> String
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: AppTheme.Spacing.sm) {
                 Image(systemName: icon)
@@ -314,7 +335,13 @@ struct EditFoodView: View {
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
                     .submitLabel(field == .fat ? .done : .next)
-                    .onSubmit { field == .fat ? (focusedField = nil) : advanceFrom(field) }
+                    .onSubmit {
+                        if field == .fat {
+                            focusedField = nil
+                        } else {
+                            advanceFrom(field)
+                        }
+                    }
                     .onChange(of: text.wrappedValue) { newValue in
                         let sanitized = sanitizer(newValue)
                         if sanitized != newValue {
@@ -435,23 +462,15 @@ struct EditFoodView: View {
         }
     }
 
-    private func nextField() {
-        guard let current = focusedField, let idx = orderedFields.firstIndex(of: current) else { return }
-        let nextIdx = min(idx + 1, orderedFields.count - 1)
-        focusedField = orderedFields[nextIdx]
-    }
-
-    private func previousField() {
-        guard let current = focusedField, let idx = orderedFields.firstIndex(of: current) else { return }
-        let prevIdx = max(idx - 1, 0)
-        focusedField = orderedFields[prevIdx]
-    }
-
     private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
         guard let field = focusedField else { return }
-        withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
+        withAnimation(.easeOut(duration: 0.25)) {
+            proxy.scrollTo(field, anchor: .bottom)
+        }
         DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(field, anchor: .bottom)
+            }
         }
     }
 

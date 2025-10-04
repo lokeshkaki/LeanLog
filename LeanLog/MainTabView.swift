@@ -2,37 +2,54 @@
 //  MainTabView.swift
 //  LeanLog
 //
-//  Created by Lokesh Kaki on 9/21/25.
-//
 
 import SwiftUI
+import SwiftData
 
 struct MainTabView: View {
+    @Query private var profiles: [UserProfile]
+    
+    @State private var selectedTab = 0
+    
+    private var hasCompletedGoals: Bool {
+        profiles.first?.isOnboardingComplete ?? false
+    }
+    
     var body: some View {
-        TabView {
-            HomeView()
+        TabView(selection: $selectedTab) {
+            GoalsView()
                 .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Home")
+                    Label("Goals", systemImage: "target")
                 }
+                .tag(0)
             
             MealsView()
                 .tabItem {
-                    Image(systemName: "fork.knife")
-                    Text("Meals")
+                    Label("Meals", systemImage: "fork.knife")
                 }
+                .tag(1)
+            
+            HomeView()
+                .tabItem {
+                    Label("Logs", systemImage: "list.clipboard")
+                }
+                .tag(2)
             
             WeeklyView()
                 .tabItem {
-                    Image(systemName: "chart.bar.fill")
-                    Text("Weekly")
+                    Label("Progress", systemImage: "chart.bar")
                 }
+                .tag(3)
             
             SettingsView()
                 .tabItem {
-                    Image(systemName: "gear")
-                    Text("Settings")
+                    Label("Settings", systemImage: "gearshape")
                 }
+                .tag(4)
+        }
+        .onAppear {
+            // Default to Goals if not set, otherwise Logs
+            selectedTab = hasCompletedGoals ? 2 : 0
         }
     }
 }

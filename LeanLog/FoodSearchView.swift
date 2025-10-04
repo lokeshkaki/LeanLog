@@ -3,7 +3,7 @@
 //  LeanLog
 //
 //  Created by Lokesh Kaki on 9/21/25.
-//  Updated: Consistent navigation styling and keyboard toolbar improvements
+//  Updated: Simplified - Native keyboard + tap-to-dismiss
 //
 
 import SwiftUI
@@ -48,7 +48,11 @@ struct FoodSearchView: View {
                     }
                     .listStyle(.plain)
                 } else if !query.isEmpty {
-                    ContentUnavailableView("No results", systemImage: "magnifyingglass", description: Text("Try another search term."))
+                    ContentUnavailableView(
+                        "No results",
+                        systemImage: "magnifyingglass",
+                        description: Text("Try another search term.")
+                    )
                 } else {
                     ContentUnavailableView.search
                 }
@@ -67,30 +71,32 @@ struct FoodSearchView: View {
             .tint(AppTheme.Colors.accent)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: AppTheme.Icons.close)
+                            .imageScale(.medium)
                     }
                     .accessibilityLabel("Close")
                 }
             }
         }
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
+        .searchable(
+            text: $query,
+            placement: .navigationBarDrawer(displayMode: .always)
+        )
         .onSubmit(of: .search) {
-            // Trigger search on submit/return
             performSearchDebounced()
         }
-        .onChange(of: query) { _, newValue in
-            // Debounce search to avoid excessive API calls
+        .onChange(of: query) { _, _ in
             performSearchDebounced()
         }
         .onDisappear {
-            // Cancel any pending search when view disappears
             searchTask?.cancel()
         }
     }
 
     private func performSearchDebounced() {
-        // Cancel previous search task
         searchTask?.cancel()
         
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -102,14 +108,9 @@ struct FoodSearchView: View {
             return
         }
         
-        // Create new search task with delay
         searchTask = Task {
-            // Wait 300ms before searching (debounce)
             try? await Task.sleep(nanoseconds: 300_000_000)
-            
-            // Check if task was cancelled
             guard !Task.isCancelled else { return }
-            
             await performSearch(trimmedQuery)
         }
     }
@@ -122,14 +123,12 @@ struct FoodSearchView: View {
         do {
             let searchResults = try await usda.searchFoods(query: term, pageSize: 20)
             
-            // Check if this is still the current search
             let currentTerm = query.trimmingCharacters(in: .whitespacesAndNewlines)
             guard term == currentTerm else { return }
             
             results = searchResults
             error = nil
         } catch {
-            // Only show error if this is still the current search
             let currentTerm = query.trimmingCharacters(in: .whitespacesAndNewlines)
             guard term == currentTerm else { return }
             
@@ -157,7 +156,6 @@ struct FoodDetailResultView: View {
     @FocusState private var focusedField: Field?
     enum Field: Hashable { case quantity }
 
-    // Locale-aware number IO
     private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
 
     var body: some View {
@@ -181,7 +179,9 @@ struct FoodDetailResultView: View {
                         Text(error)
                     } actions: {
                         Button("Retry") {
-                            Task { await loadDetail() }
+                            Task {
+                                await loadDetail()
+                            }
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -197,24 +197,13 @@ struct FoodDetailResultView: View {
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: AppTheme.Icons.close)
+                            .imageScale(.medium)
                     }
                     .accessibilityLabel("Close")
-                }
-                
-                // Keyboard toolbar for quantity field
-                ToolbarItemGroup(placement: .keyboard) {
-                    if focusedField != nil {
-                        Spacer()
-                        Button(action: { focusedField = nil }) {
-                            Image(systemName: "checkmark")
-                                .imageScale(.medium)
-                                .fontWeight(.semibold)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Done editing")
-                    }
                 }
             }
         }
@@ -223,12 +212,6 @@ struct FoodDetailResultView: View {
         }
         .refreshable {
             await loadDetail()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            KeyboardAccessoryStyler.shared.makeTransparent()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
-            KeyboardAccessoryStyler.shared.makeTransparent()
         }
     }
     
@@ -294,7 +277,6 @@ struct FoodDetailResultView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.Colors.accent)
                 
-                // Show calculated values
                 if qty != 1.0 {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Your portion:")

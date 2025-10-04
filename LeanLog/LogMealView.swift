@@ -3,7 +3,7 @@
 //  LeanLog
 //
 //  Created by Lokesh Kaki on 9/22/25.
-//  Updated: Prominent meal header + consistent keyboard styling + transparent accessory
+//  Updated: Simplified - Native keyboard + cleaner UI
 //
 
 import SwiftUI
@@ -50,28 +50,17 @@ struct LogMealView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: AppTheme.Spacing.sectionSpacing) {
-                        mealInfoSection.modernCard(elevated: true)
-                        portionCard.modernCard()
-                        nutritionCard.modernCard()
-                        logSettingsCard.modernCard()
-                        logButton
-                        Spacer(minLength: 40)
-                    }
-                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
-                    .padding(.top, AppTheme.Spacing.xl)
+            ScrollView {
+                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+                    mealInfoSection.modernCard(elevated: true)
+                    portionCard.modernCard()
+                    nutritionCard.modernCard()
+                    logSettingsCard.modernCard()
+                    logButton
+                    Spacer(minLength: 40)
                 }
-                // Handle any potential keyboard interactions and apply transparent styling
-                .onChange(of: focusedField) { _ in scrollFocusedIntoView(proxy) }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                    scrollFocusedIntoView(proxy)
-                    KeyboardAccessoryStyler.shared.makeTransparent()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
-                    KeyboardAccessoryStyler.shared.makeTransparent()
-                }
+                .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                .padding(.top, AppTheme.Spacing.xl)
             }
             .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
@@ -85,24 +74,13 @@ struct LogMealView: View {
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
+                    Button {
+                        dismiss()
+                    } label: {
                         Image(systemName: AppTheme.Icons.close)
                             .imageScale(.medium)
                     }
                     .accessibilityLabel("Cancel")
-                }
-                // Keyboard toolbar with checkmark (for any potential text input)
-                ToolbarItemGroup(placement: .keyboard) {
-                    if focusedField != nil {
-                        Spacer()
-                        Button(action: { focusedField = nil }) {
-                            Image(systemName: "checkmark")
-                                .imageScale(.medium)
-                                .fontWeight(.semibold)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Done editing")
-                    }
                 }
             }
         }
@@ -129,7 +107,6 @@ struct LogMealView: View {
         )
     }
 
-    // Prominent header: title on first row, chips on second row for clarity and emphasis
     private var mealInfoSection: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             HStack(alignment: .center, spacing: AppTheme.Spacing.md) {
@@ -144,7 +121,6 @@ struct LogMealView: View {
                 }
 
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-                    // Title row: larger, heavier for prominence
                     HStack(spacing: 8) {
                         Text(meal.name)
                             .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -157,7 +133,6 @@ struct LogMealView: View {
                         }
                     }
 
-                    // Meta chips row
                     HStack(spacing: AppTheme.Spacing.sm) {
                         metaChip("scalemass", "Yield: \(Int(meal.totalYieldGrams))g")
                         metaChip("clock", createdShort)
@@ -170,7 +145,9 @@ struct LogMealView: View {
             if !meal.ingredients.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.25)) { showIngredients.toggle() }
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showIngredients.toggle()
+                        }
                     } label: {
                         HStack {
                             Text("Ingredients")
@@ -253,7 +230,6 @@ struct LogMealView: View {
                 }
             }
         }
-        // Slim, consistent with CreateMeal
         .padding(.horizontal, AppTheme.Spacing.sm)
         .padding(.vertical, AppTheme.Spacing.sm)
     }
@@ -280,8 +256,12 @@ struct LogMealView: View {
                     .foregroundStyle(AppTheme.Colors.labelTertiary)
 
                 VStack(spacing: AppTheme.Spacing.sm) {
-                    Slider(value: $portionGrams, in: 10...max(10, meal.totalYieldGrams), step: 5)
-                        .tint(AppTheme.Colors.accent)
+                    Slider(
+                        value: $portionGrams,
+                        in: 10...max(10, meal.totalYieldGrams),
+                        step: 5
+                    )
+                    .tint(AppTheme.Colors.accent)
                     HStack {
                         Text("10g")
                             .font(AppTheme.Typography.caption2)
@@ -315,12 +295,36 @@ struct LogMealView: View {
 
             VStack(spacing: AppTheme.Spacing.md) {
                 HStack(spacing: AppTheme.Spacing.md) {
-                    NutritionMiniCard(icon: AppTheme.Icons.calories, color: AppTheme.Colors.calories, value: "\(Int(round(portionNutrition.calories)))", unit: "kcal", label: "Calories")
-                    NutritionMiniCard(icon: AppTheme.Icons.protein,  color: AppTheme.Colors.protein,  value: String(format: "%.1f", portionNutrition.protein), unit: "g", label: "Protein")
+                    NutritionMiniCard(
+                        icon: AppTheme.Icons.calories,
+                        color: AppTheme.Colors.calories,
+                        value: "\(Int(round(portionNutrition.calories)))",
+                        unit: "kcal",
+                        label: "Calories"
+                    )
+                    NutritionMiniCard(
+                        icon: AppTheme.Icons.protein,
+                        color: AppTheme.Colors.protein,
+                        value: String(format: "%.1f", portionNutrition.protein),
+                        unit: "g",
+                        label: "Protein"
+                    )
                 }
                 HStack(spacing: AppTheme.Spacing.md) {
-                    NutritionMiniCard(icon: AppTheme.Icons.carbs,    color: AppTheme.Colors.carbs,    value: String(format: "%.1f", portionNutrition.carbs),   unit: "g", label: "Carbs")
-                    NutritionMiniCard(icon: AppTheme.Icons.fat,      color: AppTheme.Colors.fat,      value: String(format: "%.1f", portionNutrition.fat),     unit: "g", label: "Fat")
+                    NutritionMiniCard(
+                        icon: AppTheme.Icons.carbs,
+                        color: AppTheme.Colors.carbs,
+                        value: String(format: "%.1f", portionNutrition.carbs),
+                        unit: "g",
+                        label: "Carbs"
+                    )
+                    NutritionMiniCard(
+                        icon: AppTheme.Icons.fat,
+                        color: AppTheme.Colors.fat,
+                        value: String(format: "%.1f", portionNutrition.fat),
+                        unit: "g",
+                        label: "Fat"
+                    )
                 }
             }
         }
@@ -365,13 +369,27 @@ struct LogMealView: View {
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
 
                 VStack(spacing: AppTheme.Spacing.sm) {
-                    Button { logAsIndividualIngredients = false } label: {
-                        selectionRow(icon: "square.stack", title: "Meal", subtitle: "1 food entry", selected: !logAsIndividualIngredients)
+                    Button {
+                        logAsIndividualIngredients = false
+                    } label: {
+                        selectionRow(
+                            icon: "square.stack",
+                            title: "Meal",
+                            subtitle: "1 food entry",
+                            selected: !logAsIndividualIngredients
+                        )
                     }
                     .buttonStyle(.plain)
 
-                    Button { logAsIndividualIngredients = true } label: {
-                        selectionRow(icon: "list.bullet", title: "Ingredients", subtitle: "\(meal.ingredients.count) separate food entries", selected: logAsIndividualIngredients)
+                    Button {
+                        logAsIndividualIngredients = true
+                    } label: {
+                        selectionRow(
+                            icon: "list.bullet",
+                            title: "Ingredients",
+                            subtitle: "\(meal.ingredients.count) separate food entries",
+                            selected: logAsIndividualIngredients
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -414,7 +432,10 @@ struct LogMealView: View {
                 .fill(selected ? AppTheme.Colors.accent.opacity(0.12) : Color.clear)
                 .overlay {
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(selected ? AppTheme.Colors.accent.opacity(0.3) : AppTheme.Colors.subtleStroke, lineWidth: 1)
+                        .stroke(
+                            selected ? AppTheme.Colors.accent.opacity(0.3) : AppTheme.Colors.subtleStroke,
+                            lineWidth: 1
+                        )
                 }
         )
     }
@@ -422,24 +443,18 @@ struct LogMealView: View {
     private var logButton: some View {
         Button(action: logMealPortion) {
             HStack(spacing: AppTheme.Spacing.sm) {
-                Image(systemName: "plus.circle.fill").font(.title3)
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
                 Text("Log to Food Diary")
                     .font(AppTheme.Typography.body.weight(.semibold))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(RoundedRectangle(cornerRadius: 16).fill(AppTheme.Colors.accentGradient))
-        }
-    }
-
-    // MARK: - Scroll helper
-
-    private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
-        guard let field = focusedField else { return }
-        withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
-        DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(field, anchor: .bottom) }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(AppTheme.Colors.accentGradient)
+            )
         }
     }
 

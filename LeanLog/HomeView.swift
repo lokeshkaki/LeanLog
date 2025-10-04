@@ -90,7 +90,7 @@ struct HomeView: View {
             .modernNavigation()
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Lean Log")
+                    Text("Logs")
                         .font(AppTheme.Typography.title3)
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
