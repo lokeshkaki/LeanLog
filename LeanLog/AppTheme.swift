@@ -182,6 +182,13 @@ struct AppTheme {
         static let large: CGFloat = 18
         static let extraLarge: CGFloat = 24
     }
+    
+    // MARK: - Layout (NEW - Added for GoalsView compatibility)
+    enum Layout {
+        static let cornerRadius: CGFloat = CornerRadius.medium
+        static let cardPadding: CGFloat = Spacing.cardPadding
+        static let screenPadding: CGFloat = Spacing.screenPadding
+    }
 
     // MARK: - Icons (SF Symbols)
     enum Icons {

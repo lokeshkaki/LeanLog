@@ -2,11 +2,7 @@
 //  AddIngredientView.swift
 //  LeanLog
 //
-//  Clean flow: No redundant Quantity (use serving size + unit).
-//  Prominent system segmented control (large) under the title.
-//  Manual uses AddFood-style macro grid with in-field units.
-//  System keyboard toolbar "Done" for all inputs.
-//  Native keyboard toolbar + QuickType + transparent accessory background.
+//  Simplified: Native keyboard + tap-to-dismiss
 //
 
 import SwiftUI
@@ -57,10 +53,9 @@ struct AddIngredientView: View {
         Int(calories) != nil
     }
 
-    private var manualFieldOrder: [ManualField] { [.name, .size, .unit, .cals, .prot, .carbs, .fat] }
-    private var focusedIndex: Int? { focused.flatMap { manualFieldOrder.firstIndex(of: $0) } }
-    private var canGoPrev: Bool { (focusedIndex ?? 0) > 0 }
-    private var canGoNext: Bool { (focusedIndex ?? (manualFieldOrder.count - 1)) < manualFieldOrder.count - 1 }
+    private var manualFieldOrder: [ManualField] {
+        [.name, .size, .unit, .cals, .prot, .carbs, .fat]
+    }
 
     var body: some View {
         NavigationStack {
@@ -68,7 +63,7 @@ struct AddIngredientView: View {
                 ScrollView {
                     VStack(spacing: AppTheme.Spacing.sectionSpacing) {
 
-                        // Prominent large segmented tabs (no wrapping)
+                        // Prominent large segmented tabs
                         Picker("", selection: $mode) {
                             ForEach(Mode.allCases) { m in
                                 Text(m.rawValue)
@@ -89,7 +84,7 @@ struct AddIngredientView: View {
                             case .manual:
                                 manualDetailsCard.modernCard()
                                 manualNutritionCard.modernCard()
-                                addButton // CTA outside card
+                                addButton
                             case .recent:
                                 recentList
                             }
@@ -99,14 +94,12 @@ struct AddIngredientView: View {
                     .padding(.top, AppTheme.Spacing.xl)
                     .padding(.bottom, 20)
                 }
-                // Keep focused field visible and refresh toolbar styling as keyboard animates
-                .onChange(of: focused) { _ in scrollFocusedIntoView(proxy) }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                    scrollFocusedIntoView(proxy)
-                    KeyboardAccessoryStyler.shared.makeTransparent()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    focused = nil
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
-                    KeyboardAccessoryStyler.shared.makeTransparent()
+                .onChange(of: focused) { _ in
+                    scrollFocusedIntoView(proxy)
                 }
             }
             .screenBackground()
@@ -120,42 +113,19 @@ struct AddIngredientView: View {
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: AppTheme.Icons.close)
+                            .imageScale(.medium)
                     }
                     .accessibilityLabel("Cancel")
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    if focused != nil {
-                        Button(action: previousField) {
-                            Image(systemName: "chevron.up").imageScale(.medium)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canGoPrev)
-                        .accessibilityLabel("Previous field")
-
-                        Button(action: nextField) {
-                            Image(systemName: "chevron.down").imageScale(.medium)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canGoNext)
-                        .accessibilityLabel("Next field")
-
-                        Spacer()
-
-                        // Use checkmark icon instead of "Done" text to save space
-                        Button(action: { focused = nil }) {
-                            Image(systemName: "checkmark")
-                                .imageScale(.medium)
-                                .fontWeight(.semibold)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Done editing")
-                    }
-                }
             }
         }
-        .onDisappear { searchTask?.cancel() }
+        .onDisappear {
+            searchTask?.cancel()
+        }
     }
 
     // MARK: - Manual
@@ -167,10 +137,11 @@ struct AddIngredientView: View {
                 .foregroundStyle(AppTheme.Colors.labelPrimary)
 
             HStack(spacing: AppTheme.Spacing.md) {
-                Image(systemName: "text.cursor").foregroundStyle(AppTheme.Colors.labelTertiary)
+                Image(systemName: "text.cursor")
+                    .foregroundStyle(AppTheme.Colors.labelTertiary)
                 TextField("Ingredient name", text: $name)
                     .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled(false)   // Keep QuickType for name
+                    .autocorrectionDisabled(false)
                     .keyboardType(.default)
                     .focused($focused, equals: .name)
                     .submitLabel(.next)
@@ -182,13 +153,16 @@ struct AddIngredientView: View {
 
             HStack(spacing: AppTheme.Spacing.md) {
                 HStack(spacing: AppTheme.Spacing.md) {
-                    Image(systemName: "scalemass").foregroundStyle(AppTheme.Colors.labelTertiary)
+                    Image(systemName: "scalemass")
+                        .foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Serving size", text: $servingSize)
                         .keyboardType(.decimalPad)
                         .focused($focused, equals: .size)
                         .submitLabel(.next)
                         .onSubmit { focused = .unit }
-                        .onChange(of: servingSize) { servingSize = numberIO.sanitizeDecimal(servingSize) }
+                        .onChange(of: servingSize) { newValue in
+                            servingSize = numberIO.sanitizeDecimal(newValue)
+                        }
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 .modernField(focused: focused == .size)
@@ -219,18 +193,53 @@ struct AddIngredientView: View {
             ]
 
             LazyVGrid(columns: columns, spacing: AppTheme.Spacing.lg) {
-                macroField(icon: AppTheme.Icons.calories, title: "Calories", unit: "kcal",
-                           color: AppTheme.Colors.calories, text: $calories, field: .cals, keyboard: .numberPad, sanitizer: { numberIO.sanitizeInteger($0) })
-                    .id(ManualField.cals)
-                macroField(icon: AppTheme.Icons.protein,  title: "Protein",  unit: "g",
-                           color: AppTheme.Colors.protein,  text: $protein,  field: .prot, keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
-                    .id(ManualField.prot)
-                macroField(icon: AppTheme.Icons.carbs,    title: "Carbs",    unit: "g",
-                           color: AppTheme.Colors.carbs,    text: $carbs,    field: .carbs, keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
-                    .id(ManualField.carbs)
-                macroField(icon: AppTheme.Icons.fat,      title: "Fat",      unit: "g",
-                           color: AppTheme.Colors.fat,      text: $fat,      field: .fat, keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
-                    .id(ManualField.fat)
+                macroField(
+                    icon: AppTheme.Icons.calories,
+                    title: "Calories",
+                    unit: "kcal",
+                    color: AppTheme.Colors.calories,
+                    text: $calories,
+                    field: .cals,
+                    keyboard: .numberPad,
+                    sanitizer: { numberIO.sanitizeInteger($0) }
+                )
+                .id(ManualField.cals)
+
+                macroField(
+                    icon: AppTheme.Icons.protein,
+                    title: "Protein",
+                    unit: "g",
+                    color: AppTheme.Colors.protein,
+                    text: $protein,
+                    field: .prot,
+                    keyboard: .decimalPad,
+                    sanitizer: { numberIO.sanitizeDecimal($0) }
+                )
+                .id(ManualField.prot)
+
+                macroField(
+                    icon: AppTheme.Icons.carbs,
+                    title: "Carbs",
+                    unit: "g",
+                    color: AppTheme.Colors.carbs,
+                    text: $carbs,
+                    field: .carbs,
+                    keyboard: .decimalPad,
+                    sanitizer: { numberIO.sanitizeDecimal($0) }
+                )
+                .id(ManualField.carbs)
+
+                macroField(
+                    icon: AppTheme.Icons.fat,
+                    title: "Fat",
+                    unit: "g",
+                    color: AppTheme.Colors.fat,
+                    text: $fat,
+                    field: .fat,
+                    keyboard: .decimalPad,
+                    sanitizer: { numberIO.sanitizeDecimal($0) }
+                )
+                .id(ManualField.fat)
             }
         }
     }
@@ -243,24 +252,16 @@ struct AddIngredientView: View {
         }
     }
 
-    private func nextField() {
-        guard let current = focused, let idx = manualFieldOrder.firstIndex(of: current) else { return }
-        focused = manualFieldOrder[min(idx + 1, manualFieldOrder.count - 1)]
-    }
-
-    private func previousField() {
-        guard let current = focused, let idx = manualFieldOrder.firstIndex(of: current) else { return }
-        focused = manualFieldOrder[max(idx - 1, 0)]
-    }
-
-    private func macroField(icon: String,
-                            title: String,
-                            unit: String,
-                            color: Color,
-                            text: Binding<String>,
-                            field: ManualField,
-                            keyboard: UIKeyboardType,
-                            sanitizer: @escaping (String) -> String) -> some View {
+    private func macroField(
+        icon: String,
+        title: String,
+        unit: String,
+        color: Color,
+        text: Binding<String>,
+        field: ManualField,
+        keyboard: UIKeyboardType,
+        sanitizer: @escaping (String) -> String
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: AppTheme.Spacing.sm) {
                 Image(systemName: icon)
@@ -281,7 +282,13 @@ struct AddIngredientView: View {
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
                     .submitLabel(field == .fat ? .done : .next)
-                    .onSubmit { field == .fat ? (focused = nil) : advance(from: field) }
+                    .onSubmit {
+                        if field == .fat {
+                            focused = nil
+                        } else {
+                            advance(from: field)
+                        }
+                    }
                     .onChange(of: text.wrappedValue) { newValue in
                         let sanitized = sanitizer(newValue)
                         if sanitized != newValue {
@@ -309,7 +316,10 @@ struct AddIngredientView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium).fill(AppTheme.Colors.accentGradient))
+            .background(
+                RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium)
+                    .fill(AppTheme.Colors.accentGradient)
+            )
         }
         .disabled(!isManualValid)
         .opacity(isManualValid ? 1 : 0.5)
@@ -324,16 +334,23 @@ struct AddIngredientView: View {
                 .foregroundStyle(AppTheme.Colors.labelPrimary)
 
             HStack(spacing: AppTheme.Spacing.md) {
-                Image(systemName: AppTheme.Icons.search).foregroundStyle(AppTheme.Colors.labelTertiary)
+                Image(systemName: AppTheme.Icons.search)
+                    .foregroundStyle(AppTheme.Colors.labelTertiary)
                 TextField("Search foods…", text: $query)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(true)
-                    .onChange(of: query) { _, _ in debounceSearch() }
+                    .onChange(of: query) { _, _ in
+                        debounceSearch()
+                    }
             }
             .modernField()
 
             if searching {
-                HStack { Spacer(); ProgressView(); Spacer() }
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
             }
         }
     }
@@ -341,7 +358,11 @@ struct AddIngredientView: View {
     private var searchResultsList: some View {
         VStack(spacing: AppTheme.Spacing.md) {
             ForEach(results) { item in
-                Button { Task { await selectSearchItem(item) } } label: {
+                Button {
+                    Task {
+                        await selectSearchItem(item)
+                    }
+                } label: {
                     HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.description)
@@ -355,7 +376,8 @@ struct AddIngredientView: View {
                             }
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(AppTheme.Colors.labelTertiary)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(AppTheme.Colors.labelTertiary)
                     }
                     .padding(AppTheme.Spacing.cardPadding)
                     .background(
@@ -380,7 +402,11 @@ struct AddIngredientView: View {
     private func debounceSearch() {
         searchTask?.cancel()
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard term.count >= 2 else { results = []; searching = false; return }
+        guard term.count >= 2 else {
+            results = []
+            searching = false
+            return
+        }
         searchTask = Task { @MainActor in
             searching = true
             try? await Task.sleep(nanoseconds: 300_000_000)
@@ -394,10 +420,12 @@ struct AddIngredientView: View {
         do {
             let r = try await usda.searchFoods(query: term, pageSize: 20)
             guard term == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-            results = r; searching = false
+            results = r
+            searching = false
         } catch {
             guard term == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-            results = []; searching = false
+            results = []
+            searching = false
         }
     }
 
@@ -439,7 +467,9 @@ struct AddIngredientView: View {
                 .frame(maxWidth: .infinity)
             } else {
                 ForEach(unique.prefix(20), id: \.id) { entry in
-                    Button { selectRecent(entry) } label: {
+                    Button {
+                        selectRecent(entry)
+                    } label: {
                         HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(entry.name)
@@ -462,7 +492,8 @@ struct AddIngredientView: View {
                                 }
                             }
                             Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(AppTheme.Colors.labelTertiary)
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(AppTheme.Colors.labelTertiary)
                         }
                         .padding(AppTheme.Spacing.cardPadding)
                         .background(
@@ -485,7 +516,8 @@ struct AddIngredientView: View {
         return entries.compactMap { e in
             let key = e.name.lowercased()
             if seen.contains(key) { return nil }
-            seen.insert(key); return e
+            seen.insert(key)
+            return e
         }
     }
 
