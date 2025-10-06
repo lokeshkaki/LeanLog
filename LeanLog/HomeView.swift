@@ -2,8 +2,9 @@
 //  HomeView.swift
 //  LeanLog
 //
-//  Created by Lokesh Kaki on 9/21/25.
-//  Updated: Stable ForEach using Identifiable items, tiny row container, fixed string interpolation
+//  Updated: After scanning (OFF), present AddFoodView with Prefill for editing before save.
+//  Includes helper subviews (DateHeaderView, DailyTotalsView, DailyEntriesSection, FloatingActionButton)
+//  so symbols are in scope for this file.
 //
 
 import SwiftUI
@@ -20,12 +21,27 @@ struct HomeView: View {
 
     // UI State
     @State private var selectedDay = Calendar.current.startOfDay(for: .now)
-    @State private var showingAdd = false
     @State private var showingSearch = false
+    @State private var showingBarcodeScanner = false
+    @State private var showingQuickAdd = false
     @State private var editingEntry: FoodEntry?
     @State private var showDatePicker = false
 
-    // Export support (broad query; UI uses day-scoped queries)
+    // Pending scanned draft to edit
+    struct ScannedDraft: Identifiable {
+        let id = UUID()
+        let name: String
+        let calories: Int
+        let protein: Double
+        let carbs: Double
+        let fat: Double
+        let servingSize: Double
+        let servingUnit: String
+        let barcode: String?
+    }
+    @State private var scannedDraft: ScannedDraft?
+
+    // Export support
     @Query(sort: [SortDescriptor(\FoodEntry.timestamp, order: .reverse)])
     private var allEntries: [FoodEntry]
 
@@ -46,46 +62,55 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.sectionSpacing) {
-                    DateHeaderView(
-                        selectedDay: selectedDay,
-                        dayFormatter: Self.dayFormatter,
-                        onPreviousDay: { changeDay(by: -1) },
-                        onNextDay: { changeDay(by: 1) },
-                        onDateTap: { showDatePicker = true }
-                    )
-                    .padding(.top, AppTheme.Spacing.xl)
+            ZStack(alignment: .bottomTrailing) {
+                // Main Content
+                ScrollView {
+                    VStack(spacing: AppTheme.Spacing.sectionSpacing) {
+                        DateHeaderView(
+                            selectedDay: selectedDay,
+                            dayFormatter: Self.dayFormatter,
+                            onPreviousDay: { changeDay(by: -1) },
+                            onNextDay: { changeDay(by: 1) },
+                            onDateTap: { showDatePicker = true }
+                        )
+                        .padding(.top, AppTheme.Spacing.xl)
 
-                    DailyTotalsView(
-                        start: startOfDay,
-                        end: endOfDay,
-                        calorieGoal: dailyCalorieGoal,
-                        proteinGoal: proteinGoal,
-                        carbGoal: carbGoal,
-                        fatGoal: fatGoal
-                    )
-                    .padding(.horizontal, AppTheme.Spacing.screenPadding)
-
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                        Text("Food Logs")
-                            .font(AppTheme.Typography.title2)
-                            .foregroundStyle(AppTheme.Colors.labelPrimary)
-                            .padding(.horizontal, AppTheme.Spacing.screenPadding)
-
-                        DailyEntriesSection(
+                        DailyTotalsView(
                             start: startOfDay,
                             end: endOfDay,
-                            onEntryTap: { entry in editingEntry = entry },
-                            onEntryDelete: deleteEntry
+                            calorieGoal: dailyCalorieGoal,
+                            proteinGoal: proteinGoal,
+                            carbGoal: carbGoal,
+                            fatGoal: fatGoal
                         )
                         .padding(.horizontal, AppTheme.Spacing.screenPadding)
-                    }
 
-                    Spacer(minLength: 80)
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+                            Text("Food Logs")
+                                .font(AppTheme.Typography.title2)
+                                .foregroundStyle(AppTheme.Colors.labelPrimary)
+                                .padding(.horizontal, AppTheme.Spacing.screenPadding)
+
+                            DailyEntriesSection(
+                                start: startOfDay,
+                                end: endOfDay,
+                                onEntryTap: { entry in editingEntry = entry },
+                                onEntryDelete: deleteEntry
+                            )
+                            .padding(.horizontal, AppTheme.Spacing.screenPadding)
+                        }
+
+                        Spacer(minLength: 120)
+                    }
                 }
+                .screenBackground()
+
+                FloatingActionButton(
+                    onScan: { showingBarcodeScanner = true },
+                    onSearch: { showingSearch = true },
+                    onQuickAdd: { showingQuickAdd = true }
+                )
             }
-            .screenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .modernNavigation()
             .toolbar {
@@ -94,38 +119,54 @@ struct HomeView: View {
                         .font(AppTheme.Typography.title3)
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    HStack(spacing: 10) {
-                        Button { showingSearch = true } label: {
-                            Image(systemName: AppTheme.Icons.search)
-                                .font(.system(size: 17, weight: .semibold))   // uniform
-                                .imageScale(.medium)                           // uniform
-                                .frame(width: 44, height: 44)                  // equal tap target
-                        }
-
-                        ExportCSVButton(entries: entriesForExport, day: selectedDay)
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 17, weight: .semibold))       // uniform
-                            .imageScale(.medium)                               // uniform
-                            .frame(width: 44, height: 44)                      // equal tap target
-
-                        Button { showingAdd = true } label: {
-                            Image(systemName: AppTheme.Icons.add)
-                                .font(.system(size: 17, weight: .semibold))   // uniform
-                                .imageScale(.medium)                           // uniform
-                                .frame(width: 44, height: 44)                  // equal tap target
-                        }
-                    }
+                ToolbarItem(placement: .topBarTrailing) {
+                    ExportCSVButton(entries: entriesForExport, day: selectedDay)
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 17, weight: .semibold))
+                        .imageScale(.medium)
+                        .frame(width: 44, height: 44)
                 }
             }
             .sheet(isPresented: $showDatePicker) {
                 DatePickerSheet(selectedDay: $selectedDay, onDismiss: { showDatePicker = false })
             }
-            .sheet(isPresented: $showingAdd) {
-                AddFoodView(defaultDate: selectedDay)
+            .sheet(isPresented: $showingQuickAdd) {
+                AddFoodView(defaultDate: selectedDay) // manual add
             }
             .sheet(isPresented: $showingSearch) {
                 FoodSearchView()
+            }
+            .fullScreenCover(isPresented: $showingBarcodeScanner) {
+                // OFF-backed scanner → draft to edit (do not insert here)
+                BarcodeScannerWrapper { name, calories, protein, carbs, fat, servingSize, servingUnit in
+                    scannedDraft = ScannedDraft(
+                        name: name,
+                        calories: calories,
+                        protein: protein,
+                        carbs: carbs,
+                        fat: fat,
+                        servingSize: servingSize,
+                        servingUnit: servingUnit,
+                        barcode: nil
+                    )
+                }
+            }
+            // Editor sheet shown after scan; user can adjust, then Save writes to SwiftData
+            .sheet(item: $scannedDraft) { draft in
+                AddFoodView(
+                    defaultDate: selectedDay,
+                    prefill: .init(
+                        name: draft.name,
+                        calories: draft.calories,
+                        protein: draft.protein,
+                        carbs: draft.carbs,
+                        fat: draft.fat,
+                        servingSize: draft.servingSize,
+                        servingUnit: draft.servingUnit,
+                        source: "OFF",
+                        externalId: draft.barcode
+                    )
+                )
             }
             .sheet(item: $editingEntry) { entry in
                 EditFoodView(entry: entry)
@@ -147,6 +188,73 @@ struct HomeView: View {
         do { try modelContext.save() } catch {
             print("Error deleting entry: \(error)")
         }
+    }
+}
+
+// MARK: - Floating Action Button (no context menu)
+
+struct FloatingActionButton: View {
+    let onScan: () -> Void
+    let onSearch: () -> Void
+    let onQuickAdd: () -> Void
+    @State private var showDialog = false
+
+    var body: some View {
+        Button { showDialog = true } label: {
+            ZStack {
+                Circle()
+                    .fill(AppTheme.Colors.accentGradient)
+                    .frame(width: AppTheme.FAB.size, height: AppTheme.FAB.size)
+                    .shadow(color: .black.opacity(AppTheme.FAB.shadowOpacity),
+                            radius: AppTheme.FAB.shadowRadius,
+                            y: AppTheme.FAB.shadowY)
+                Image(systemName: AppTheme.Icons.add)
+                    .font(.system(size: AppTheme.FAB.iconSize, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .confirmationDialog("Add Food", isPresented: $showDialog, titleVisibility: .visible) {
+            Button("Scan Barcode") { onScan() }
+            Button("Search Foods") { onSearch() }
+            Button("Quick Add") { onQuickAdd() }
+            Button("Cancel", role: .cancel) { }
+        }
+        .padding(.trailing, AppTheme.FAB.trailingPadding)
+        .padding(.bottom, AppTheme.FAB.bottomPadding)
+    }
+}
+
+// MARK: - Date Header
+
+struct DateHeaderView: View {
+    let selectedDay: Date
+    let dayFormatter: DateFormatter
+    let onPreviousDay: () -> Void
+    let onNextDay: () -> Void
+    let onDateTap: () -> Void
+
+    var body: some View {
+        HStack {
+            Button(action: onPreviousDay) {
+                Image(systemName: AppTheme.Icons.back)
+                    .font(.title3)
+            }
+            Spacer()
+            Button(action: onDateTap) {
+                Text(dayFormatter.string(from: selectedDay))
+                    .font(AppTheme.Typography.title3)
+                    .foregroundStyle(AppTheme.Colors.labelPrimary)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Select date")
+            Spacer()
+            Button(action: onNextDay) {
+                Image(systemName: "chevron.right")
+                    .font(.title3)
+            }
+        }
+        .padding(.horizontal, AppTheme.Spacing.screenPadding)
     }
 }
 
@@ -217,7 +325,6 @@ private struct DailyEntriesSection: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Build an array of pairs (previous, current) to keep the builder tiny
             let pairs: [(previous: FoodEntry?, current: FoodEntry)] = {
                 var result: [(FoodEntry?, FoodEntry)] = []
                 result.reserveCapacity(entries.count)
@@ -246,7 +353,6 @@ private struct DailyEntriesSection: View {
     }
 }
 
-// Minimal wrapper so complex modifiers aren’t inline
 private struct DailyEntryRowContainer: View {
     let entry: FoodEntry
     let previousEntry: FoodEntry?
@@ -432,7 +538,7 @@ struct EmptyStateView: View {
                 .font(AppTheme.Typography.headline)
                 .foregroundStyle(AppTheme.Colors.labelSecondary)
 
-            Text("Tap the + button to add your first meal")
+            Text("Tap the + button to add food")
                 .font(AppTheme.Typography.subheadline)
                 .foregroundStyle(AppTheme.Colors.labelTertiary)
                 .multilineTextAlignment(.center)
@@ -449,38 +555,5 @@ struct EmptyStateView: View {
                 }
         )
         .padding(.top, AppTheme.Spacing.lg)
-    }
-}
-
-// DateHeaderView themed
-struct DateHeaderView: View {
-    let selectedDay: Date
-    let dayFormatter: DateFormatter
-    let onPreviousDay: () -> Void
-    let onNextDay: () -> Void
-    let onDateTap: () -> Void
-
-    var body: some View {
-        HStack {
-            Button(action: onPreviousDay) {
-                Image(systemName: AppTheme.Icons.back)
-                    .font(.title3)
-            }
-            Spacer()
-            Button(action: onDateTap) {
-                Text(dayFormatter.string(from: selectedDay))
-                    .font(AppTheme.Typography.title3)
-                    .foregroundStyle(AppTheme.Colors.labelPrimary)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Select date")
-            Spacer()
-            Button(action: onNextDay) {
-                Image(systemName: "chevron.right")
-                    .font(.title3)
-            }
-        }
-        .padding(.horizontal, AppTheme.Spacing.screenPadding)
     }
 }

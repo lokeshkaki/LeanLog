@@ -3,6 +3,7 @@
 //  LeanLog
 //
 //  Simplified: Native keyboard + tap-to-dismiss
+//  Updated: Supports Prefill so scanned foods can be edited before saving.
 //
 
 import SwiftUI
@@ -15,6 +16,22 @@ struct AddFoodView: View {
 
     let defaultDate: Date
 
+    // NEW: optional prefill for scanned items (or other sources)
+    struct Prefill: Sendable {
+        let name: String?
+        let calories: Int?
+        let protein: Double?
+        let carbs: Double?
+        let fat: Double?
+        let servingSize: Double?
+        let servingUnit: String?
+        let source: String?           // e.g., "OFF", "USDA"
+        let externalId: String?       // e.g., barcode
+    }
+
+    private let prefill: Prefill?
+
+    // Fields
     @State private var name = ""
     @State private var calories = ""
     @State private var protein = ""
@@ -32,9 +49,25 @@ struct AddFoodView: View {
         case name, servingSize, servingUnit, calories, protein, carbs, fat
     }
 
-    init(defaultDate: Date) {
+    init(defaultDate: Date, prefill: Prefill? = nil) {
         self.defaultDate = defaultDate
-        self._selectedDate = State(initialValue: Calendar.current.startOfDay(for: defaultDate))
+        self.prefill = prefill
+        let sod = Calendar.current.startOfDay(for: defaultDate)
+        self._selectedDate = State(initialValue: sod)
+
+        // Seed states from prefill (stringify with reasonable precision)
+        let fmt2: (Double?) -> String = { v in
+            guard let v = v else { return "" }
+            if v == floor(v) { return String(Int(v)) }
+            return String(format: "%.2f", v)
+        }
+        self._name = State(initialValue: prefill?.name ?? "")
+        self._calories = State(initialValue: prefill?.calories.map { String($0) } ?? "")
+        self._protein = State(initialValue: fmt2(prefill?.protein))
+        self._carbs = State(initialValue: fmt2(prefill?.carbs))
+        self._fat = State(initialValue: fmt2(prefill?.fat))
+        self._servingSize = State(initialValue: fmt2(prefill?.servingSize))
+        self._servingUnit = State(initialValue: prefill?.servingUnit ?? "")
     }
 
     private var orderedFields: [Field] {
@@ -58,34 +91,24 @@ struct AddFoodView: View {
                     .padding(.horizontal, AppTheme.Spacing.screenPadding)
                     .padding(.top, AppTheme.Spacing.xl)
                 }
-                .contentShape(Rectangle()) // Make entire scroll view tappable
-                .onTapGesture {
-                    focusedField = nil // Dismiss keyboard on tap outside
-                }
-                .onChange(of: focusedField) { _ in
-                    scrollFocusedIntoView(proxy)
-                }
+                .contentShape(Rectangle())
+                .onTapGesture { focusedField = nil }
+                .onChange(of: focusedField) { _ in scrollFocusedIntoView(proxy) }
             }
             .screenBackground()
-            .navigationTitle("Add Food")
+            .navigationTitle(prefill == nil ? "Add Food" : "Edit Food")
             .navigationBarTitleDisplayMode(.inline)
             .tint(AppTheme.Colors.accent)
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: AppTheme.Icons.close)
-                            .imageScale(.medium)
-                    }
-                    .accessibilityLabel("Cancel")
+                    Button { dismiss() } label: {
+                        Image(systemName: AppTheme.Icons.close).imageScale(.medium)
+                    }.accessibilityLabel("Cancel")
                 }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: saveFood) {
-                        Image(systemName: AppTheme.Icons.save)
-                            .symbolRenderingMode(.hierarchical)
+                        Image(systemName: AppTheme.Icons.save).symbolRenderingMode(.hierarchical)
                     }
                     .disabled(!isValid)
                     .opacity(isValid ? 1 : 0.4)
@@ -100,19 +123,17 @@ struct AddFoodView: View {
     private var headerCard: some View {
         HStack(spacing: AppTheme.Spacing.lg) {
             ZStack {
-                Circle()
-                    .fill(AppTheme.Colors.accentGradient)
-                    .frame(width: 48, height: 48)
+                Circle().fill(AppTheme.Colors.accentGradient).frame(width: 48, height: 48)
                 Image(systemName: "fork.knife.circle.fill")
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.white)
                     .font(.system(size: 22, weight: .semibold))
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text("Create a new entry")
+                Text(prefill == nil ? "Create a new entry" : "Review and edit")
                     .font(AppTheme.Typography.title3)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
-                Text("Enter food details, macros, and date.")
+                Text("Adjust name, serving, calories, and macros, then save.")
                     .font(AppTheme.Typography.subheadline)
                     .foregroundStyle(AppTheme.Colors.labelSecondary)
             }
@@ -129,8 +150,7 @@ struct AddFoodView: View {
             // Name
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Image(systemName: "text.cursor")
-                        .foregroundStyle(AppTheme.Colors.labelTertiary)
+                    Image(systemName: "text.cursor").foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Food name", text: $name)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled(false)
@@ -140,11 +160,8 @@ struct AddFoodView: View {
                         .onSubmit { focusedField = .servingSize }
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                     if !name.isEmpty {
-                        Button {
-                            name = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(AppTheme.Colors.labelTertiary)
+                        Button { name = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(AppTheme.Colors.labelTertiary)
                         }
                         .accessibilityLabel("Clear name")
                     }
@@ -162,24 +179,20 @@ struct AddFoodView: View {
             // Serving
             HStack(spacing: AppTheme.Spacing.md) {
                 HStack {
-                    Image(systemName: "scale.3d")
-                        .foregroundStyle(AppTheme.Colors.labelTertiary)
+                    Image(systemName: "scale.3d").foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Serving size", text: $servingSize)
                         .keyboardType(.decimalPad)
                         .focused($focusedField, equals: .servingSize)
                         .submitLabel(.next)
                         .onSubmit { focusedField = .servingUnit }
-                        .onChange(of: servingSize) { newValue in
-                            servingSize = numberIO.sanitizeDecimal(newValue)
-                        }
+                        .onChange(of: servingSize) { servingSize = numberIO.sanitizeDecimal($0) }
                         .foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 .modernField(focused: focusedField == .servingSize)
                 .id(Field.servingSize)
 
                 HStack {
-                    Image(systemName: "ruler")
-                        .foregroundStyle(AppTheme.Colors.labelTertiary)
+                    Image(systemName: "ruler").foregroundStyle(AppTheme.Colors.labelTertiary)
                     TextField("Unit (e.g., g, oz)", text: $servingUnit)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
@@ -206,53 +219,25 @@ struct AddFoodView: View {
             ]
 
             LazyVGrid(columns: columns, spacing: AppTheme.Spacing.lg) {
-                macroField(
-                    icon: AppTheme.Icons.calories,
-                    title: "Calories",
-                    unit: "kcal",
-                    color: AppTheme.Colors.calories,
-                    text: $calories,
-                    field: .calories,
-                    keyboard: .numberPad,
-                    sanitizer: { numberIO.sanitizeInteger($0) }
-                )
-                .id(Field.calories)
+                macroField(icon: AppTheme.Icons.calories, title: "Calories", unit: "kcal",
+                           color: AppTheme.Colors.calories, text: $calories, field: .calories,
+                           keyboard: .numberPad, sanitizer: { numberIO.sanitizeInteger($0) })
+                    .id(Field.calories)
 
-                macroField(
-                    icon: AppTheme.Icons.protein,
-                    title: "Protein",
-                    unit: "g",
-                    color: AppTheme.Colors.protein,
-                    text: $protein,
-                    field: .protein,
-                    keyboard: .decimalPad,
-                    sanitizer: { numberIO.sanitizeDecimal($0) }
-                )
-                .id(Field.protein)
+                macroField(icon: AppTheme.Icons.protein, title: "Protein", unit: "g",
+                           color: AppTheme.Colors.protein, text: $protein, field: .protein,
+                           keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
+                    .id(Field.protein)
 
-                macroField(
-                    icon: AppTheme.Icons.carbs,
-                    title: "Carbs",
-                    unit: "g",
-                    color: AppTheme.Colors.carbs,
-                    text: $carbs,
-                    field: .carbs,
-                    keyboard: .decimalPad,
-                    sanitizer: { numberIO.sanitizeDecimal($0) }
-                )
-                .id(Field.carbs)
+                macroField(icon: AppTheme.Icons.carbs, title: "Carbs", unit: "g",
+                           color: AppTheme.Colors.carbs, text: $carbs, field: .carbs,
+                           keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
+                    .id(Field.carbs)
 
-                macroField(
-                    icon: AppTheme.Icons.fat,
-                    title: "Fat",
-                    unit: "g",
-                    color: AppTheme.Colors.fat,
-                    text: $fat,
-                    field: .fat,
-                    keyboard: .decimalPad,
-                    sanitizer: { numberIO.sanitizeDecimal($0) }
-                )
-                .id(Field.fat)
+                macroField(icon: AppTheme.Icons.fat, title: "Fat", unit: "g",
+                           color: AppTheme.Colors.fat, text: $fat, field: .fat,
+                           keyboard: .decimalPad, sanitizer: { numberIO.sanitizeDecimal($0) })
+                    .id(Field.fat)
             }
 
             if calories.isEmpty && (!protein.isEmpty || !carbs.isEmpty || !fat.isEmpty) {
@@ -275,13 +260,8 @@ struct AddFoodView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: AppTheme.Spacing.sm) {
-                Image(systemName: icon)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(color)
-                    .frame(width: 22)
-                Text(title)
-                    .font(AppTheme.Typography.callout)
-                    .foregroundStyle(AppTheme.Colors.labelSecondary)
+                Image(systemName: icon).symbolRenderingMode(.hierarchical).foregroundStyle(color).frame(width: 22)
+                Text(title).font(AppTheme.Typography.callout).foregroundStyle(AppTheme.Colors.labelSecondary)
             }
             HStack {
                 TextField("0", text: text)
@@ -290,23 +270,12 @@ struct AddFoodView: View {
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
                     .submitLabel(field == .fat ? .done : .next)
-                    .onSubmit {
-                        if field == .fat {
-                            focusedField = nil
-                        } else {
-                            advanceFrom(field)
-                        }
+                    .onSubmit { field == .fat ? (focusedField = nil) : advanceFrom(field) }
+                    .onChange(of: text.wrappedValue) {
+                        let sanitized = sanitizer($0)
+                        if sanitized != $0 { text.wrappedValue = sanitized }
                     }
-                    .onChange(of: text.wrappedValue) { newValue in
-                        let sanitized = sanitizer(newValue)
-                        if sanitized != newValue {
-                            text.wrappedValue = sanitized
-                        }
-                    }
-
-                Text(unit)
-                    .font(AppTheme.Typography.callout)
-                    .foregroundStyle(AppTheme.Colors.labelTertiary)
+                Text(unit).font(AppTheme.Typography.callout).foregroundStyle(AppTheme.Colors.labelTertiary)
             }
             .modernField(focused: focusedField == field)
         }
@@ -319,12 +288,8 @@ struct AddFoodView: View {
                 .foregroundStyle(AppTheme.Colors.labelPrimary)
             HStack {
                 HStack(spacing: AppTheme.Spacing.md) {
-                    Image(systemName: AppTheme.Icons.calendar)
-                        .foregroundStyle(AppTheme.Colors.accent)
-                        .frame(width: 24)
-                    Text("Date")
-                        .font(AppTheme.Typography.body)
-                        .foregroundStyle(AppTheme.Colors.labelPrimary)
+                    Image(systemName: AppTheme.Icons.calendar).foregroundStyle(AppTheme.Colors.accent).frame(width: 24)
+                    Text("Date").font(AppTheme.Typography.body).foregroundStyle(AppTheme.Colors.labelPrimary)
                 }
                 Spacer()
                 DatePicker("", selection: $selectedDate, displayedComponents: [.date])
@@ -347,30 +312,23 @@ struct AddFoodView: View {
     private var calculatedValuesCard: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             HStack(spacing: AppTheme.Spacing.md) {
-                Image(systemName: AppTheme.Icons.function)
-                    .foregroundStyle(AppTheme.Colors.labelSecondary)
-                Text("Calculated values")
-                    .font(AppTheme.Typography.headline)
-                    .foregroundStyle(AppTheme.Colors.labelPrimary)
+                Image(systemName: AppTheme.Icons.function).foregroundStyle(AppTheme.Colors.labelSecondary)
+                Text("Calculated values").font(AppTheme.Typography.headline).foregroundStyle(AppTheme.Colors.labelPrimary)
                 Spacer()
             }
             let macroCals = calculateMacroCalories()
             let enteredCals = Int(calories) ?? 0
             let mismatch = abs(macroCals - enteredCals) > 10 && enteredCals > 0
             HStack {
-                Text("Calories from macros")
-                    .font(AppTheme.Typography.callout)
-                    .foregroundStyle(AppTheme.Colors.labelSecondary)
+                Text("Calories from macros").font(AppTheme.Typography.callout).foregroundStyle(AppTheme.Colors.labelSecondary)
                 Spacer()
                 Text("\(macroCals) kcal")
-                    .font(AppTheme.Typography.callout)
-                    .fontWeight(.semibold)
+                    .font(AppTheme.Typography.callout).fontWeight(.semibold)
                     .foregroundStyle(mismatch ? AppTheme.Colors.warning : AppTheme.Colors.labelPrimary)
             }
             if mismatch {
                 HStack(spacing: AppTheme.Spacing.sm) {
-                    Image(systemName: AppTheme.Icons.warning)
-                        .foregroundStyle(AppTheme.Colors.warning)
+                    Image(systemName: AppTheme.Icons.warning).foregroundStyle(AppTheme.Colors.warning)
                     Text("Mismatch detected with entered calories.")
                         .font(AppTheme.Typography.caption)
                         .foregroundStyle(AppTheme.Colors.warning)
@@ -381,8 +339,7 @@ struct AddFoodView: View {
                     } label: {
                         Text("Use 4–4–9")
                             .font(AppTheme.Typography.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Capsule().fill(AppTheme.Colors.accentGradient))
                             .foregroundStyle(.white)
                     }
@@ -427,8 +384,8 @@ struct AddFoodView: View {
             servingUnit: servingUnit.isEmpty ? nil : servingUnit.trimmingCharacters(in: .whitespacesAndNewlines),
             date: Calendar.current.startOfDay(for: selectedDate),
             timestamp: Date(),
-            source: "Manual",
-            externalId: nil
+            source: prefill?.source ?? "Manual",
+            externalId: prefill?.externalId
         )
 
         modelContext.insert(entry)
@@ -465,9 +422,7 @@ private struct LocalizedNumberIO {
         self.formatter = nf
     }
 
-    private var decimalSeparator: String {
-        formatter.decimalSeparator ?? "."
-    }
+    private var decimalSeparator: String { formatter.decimalSeparator ?? "." }
 
     func parseDecimal(_ s: String) -> Double? {
         guard !s.isEmpty else { return nil }

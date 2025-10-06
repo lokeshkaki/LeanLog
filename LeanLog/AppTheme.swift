@@ -2,8 +2,7 @@
 //  AppTheme.swift
 //  LeanLog
 //
-//  Created by Lokesh Kaki on 9/21/25.
-//  Updated: Modern palette + components + legacy aliases for backward compatibility
+//  Updated: Added FAB constants
 //
 
 import SwiftUI
@@ -103,37 +102,27 @@ struct AppTheme {
         )
     }
 
-    // MARK: - Legacy Compatibility (aliases for older references)
-    // Backgrounds
+    // MARK: - Legacy Compatibility
     static let primaryBackground = Colors.background
     static let secondaryBackground = Colors.surface
     static let tertiaryBackground = Colors.surfaceElevated
-
-    // Surfaces
     static let cardBackground = Colors.surface
     static let cardBackgroundElevated = Colors.surfaceElevated
     static let inputBackground = Colors.input
     static let separatorColor = Colors.stroke
-
-    // Text
     static let primaryText = Colors.labelPrimary
     static let secondaryText = Colors.labelSecondary
     static let tertiaryText = Colors.labelTertiary
     static let placeholderText = Colors.placeholder
-
-    // Macro & status colors
     static let calories = Colors.calories
     static let protein = Colors.protein
     static let carbs = Colors.carbs
     static let fat = Colors.fat
-
     static let accentBlue = Colors.accent
     static let accentBlueTapped = Colors.accentPressed
     static let destructiveRed = Colors.destructive
     static let warningOrange = Colors.warning
     static let successGreen = Colors.success
-
-    // Progress
     static let progressNormal = Colors.labelSecondary
     static let progressOver = Colors.destructive
     static let progressComplete = Colors.success
@@ -183,11 +172,22 @@ struct AppTheme {
         static let extraLarge: CGFloat = 24
     }
     
-    // MARK: - Layout (NEW - Added for GoalsView compatibility)
+    // MARK: - Layout
     enum Layout {
         static let cornerRadius: CGFloat = CornerRadius.medium
         static let cardPadding: CGFloat = Spacing.cardPadding
         static let screenPadding: CGFloat = Spacing.screenPadding
+    }
+    
+    // MARK: - FAB (NEW)
+    enum FAB {
+        static let size: CGFloat = 56
+        static let iconSize: CGFloat = 22
+        static let bottomPadding: CGFloat = 16  // 16pt above tab bar (49+34=83) + 17pt
+        static let trailingPadding: CGFloat = 20
+        static let shadowRadius: CGFloat = 8
+        static let shadowOpacity: Double = 0.2
+        static let shadowY: CGFloat = 4
     }
 
     // MARK: - Icons (SF Symbols)
@@ -199,6 +199,7 @@ struct AppTheme {
 
         static let add = "plus"
         static let search = "magnifyingglass"
+        static let scan = "barcode.viewfinder"
         static let share = "square.and.arrow.up"
         static let edit = "pencil"
         static let delete = "trash"
@@ -241,14 +242,12 @@ struct AppTheme {
 
 // MARK: - View Modifiers
 extension View {
-    // Screen background
     func screenBackground() -> some View {
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(AppTheme.Colors.background)
     }
 
-    // Navigation styling
     func modernNavigation() -> some View {
         self
             .toolbarBackground(.visible, for: .navigationBar)
@@ -256,7 +255,6 @@ extension View {
             .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
-    // Modern glass card
     func modernCard(elevated: Bool = false) -> some View {
         self
             .padding(AppTheme.Spacing.cardPadding)
@@ -271,7 +269,6 @@ extension View {
             .shadow(color: Color.black.opacity(elevated ? 0.35 : 0.25), radius: elevated ? 18 : 12, x: 0, y: elevated ? 10 : 6)
     }
 
-    // Input styling
     func modernField(focused: Bool = false) -> some View {
         self
             .padding(.horizontal, AppTheme.Spacing.md)
@@ -287,7 +284,6 @@ extension View {
             .shadow(color: Color.black.opacity(focused ? 0.35 : 0.18), radius: focused ? 10 : 6, x: 0, y: focused ? 6 : 3)
     }
 
-    // Legacy wrappers for compatibility with existing views
     func primaryCard() -> some View {
         self.modernCard(elevated: false)
     }
