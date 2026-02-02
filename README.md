@@ -47,17 +47,19 @@ A native iOS nutrition tracking app built with SwiftUI and SwiftData. Track your
 ### 🍽️ Meal Management
 - Create custom meal templates with multiple ingredients
 - Calculate nutrition per 100g automatically
-- Favorite frHighlights
-
-### Architectequently used meals
+- Favorite frequently used meals
 - Edit and update meal recipes
 - Quick meal logging with portion control
 
-## Technical ure & Design Decisions
-- **SwiftUI + SwiftData**: Leveraged iOS 17's modern persistence layer for type-safe, performant local storage
+## Technical Highlights
+
+### Architecture & Design
+- **SwiftUI + SwiftData**: iOS 17's modern persistence layer for type-safe local storage
 - **MVVM Pattern**: Clean separation of concerns with SwiftData models as single source of truth
-- **Reactive UI**: Used `@Query`, `@Environment`, and property wrappers for automatic UI updates
-- **Modular Desi& Optimizations
+- **Reactive UI**: `@Query`, `@Environment`, and property wrappers for automatic UI updates
+- **Modular Design**: Separated networking, models, UI components, and utilities
+
+### Performance & Optimizations
 - Debounced search (300ms) for USDA API calls
 - Date-based filtering using normalized timestamps for fast queries
 - Async/await concurrency for network operations
@@ -67,9 +69,7 @@ A native iOS nutrition tracking app built with SwiftUI and SwiftData. Track your
 - Service layer abstraction for USDA and OpenFoodFacts APIs
 - Locale-aware number formatting for international support
 - Comprehensive error handling with graceful fallbacks
-- Secure API key management via excluded plistnal APIs
-- **Secrets Management**: Secure API key storage via plist excluded from version control
-- **Rate Limiting**: Respects USDA API limits with proper error handling
+- Secure API key management via excluded plist
 
 ## Technical Details
 
@@ -81,11 +81,11 @@ A native iOS nutrition tracking app built with SwiftUI and SwiftData. Track your
 
 ### Key Technologies
 - **SwiftData**: Modern data persistence with automatic schema migration
-- **AVFoundation**: Real-time barcode scanning with camera integration
-- **URLSession**: Async/await networking with structured concurrency
-- **Swift Concurrency**: Task-based async oper
+- **AVFoundation**: Real-time barcode scanning
 - **URLSession**: Async/await networking with structured concurrency
 - **Swift Concurrency**: Task-based async operations
+
+### Data Models
 
 #### FoodEntry
 Primary model for individual food logs with comprehensive nutritional data:
@@ -207,12 +207,6 @@ LeanLog/
 1. Launch the app and complete the onboarding
 2. Enter your personal information (age, height, weight)
 3. Select your goal type and activity level
-swift](LeanLog/Theme/AppTheme.swift)) ensuring consistency across the app:
-
-### Design Principles
-- **Native Feel**: Follows Apple's Human Interface Guidelines
-- **Dynamic Theming**: Automatic light/dark mode with semantic color system
-- **Accessibility First**: Uses system font scaling and high contrast support
 4. Choose your preferred diet type
 5. Review your calculated daily targets
 
@@ -241,27 +235,26 @@ swift](LeanLog/Theme/AppTheme.swift)) ensuring consistency across the app:
 
 ## Design System
 
-LeanLog implements a centralized design system ([AppTheme.swift](LeanLog/Theme/AppTheme.swift))
+LeanLog implements a centralized design system ([AppTheme.swift](LeanLog/Theme/AppTheme.swift)):
+
+### Design Principles
+- **Native Feel**: Follows Apple's Human Interface Guidelines
+- **Dynamic Theming**: Automatic light/dark mode with semantic color system
+- **Accessibility First**: System font scaling and high contrast support
+- **Consistent Spacing**: Standardized layout constants (xs/sm/md/lg/xl)
 - **Reusable Components**: Modular view modifiers for cards, buttons, and fields
-Technical Challengelements with modern styling
 
-## Data Privacy
+### Color System
+```swift
+// Dynamic colors adapt to light/dark mode
+static let background = dynamic(light: .systemGroupedBackground, dark: .black)
+static let surface = dynamic(light: .secondarySystemGroupedBackground, dark: custom)
+```
 
-- All data is stored locally on your device using SwiftData
-- No cloud sync or external storage
-- API calls are made directly to USDA/OpenFoodFacts
-- No user tracking or analytics
+### Typography
+Consistent font scaling using `AppTheme.Typography` with weights for title, headline, body, callout, and caption styles.
 
-## Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-Technical Challenges & Solutions
+## Technical Challenges
 
 ### Challenge: Locale-Aware Number Input
 **Problem**: SwiftUI's TextField doesn't respect decimal separators across locales (comma vs period)  
@@ -288,39 +281,25 @@ Technical Challenges & Solutions
 LeanLog is a portfolio project showcasing production-ready iOS development. It demonstrates:
 - Modern SwiftUI architecture and best practices
 - Integration with external REST APIs
-- Complex data modeling with relationships
-- Real-time camera integration (AVFoundation)
-- Professional UI/UX design patterns
-- Locale-aware internationalization
+- Barcode scanning requires camera access (standard iOS permission flow)
+- USDA free tier limited to 1000 requests/hour
+- Offline mode not supported - internet required for searches
+- OpenFoodFacts coverage varies by region
 
-Built as a demonstration of senior/staff-level iOS engineering capabilities.
-Future Enhancements
+## Data Privacy
 
-- Apple Health integration (HealthKit API)
+- All data stored locally using SwiftData - no cloud sync or remote storage
+- Zero analytics, crash reporting, or user behavior tracking
+- API calls go directly to USDA/OpenFoodFacts - no intermediary servers
+- API keys stored in excluded plist file, never committed to version control
+
+## Future Enhancements
+
+- Apple Health integration (HealthKit)
 - Widget support (WidgetKit)
 - Watch app companion
 - Photo-based logging (Vision framework)
 - iCloud sync (CloudKit)
-
-## License
-
-Copyright © 2025 Lokesh Kaki. All rights reserved.
-
-## Acknowledgments
-
-- **USDA FoodData Central** for comprehensive food nutrition data
-- **OpenFoodFacts** for barcode scanning and international product database
-- **Apple** for SwiftUI, SwiftData, and SF Symbols
-- **Open Source Community** for inspiration and best practices
-
-## Support
-
-For questions, issues, or feature requests, please open an issue on GitHub.
-
----
-
-**Built with ❤️ using SwiftUI**
-.
 
 ## Acknowledgments
 
@@ -330,4 +309,4 @@ For questions, issues, or feature requests, please open an issue on GitHub.
 
 ---
 
-**Author**: Lokesh Kaki
+Copyright © 2025 Lokesh Kaki. All rights reserved.
