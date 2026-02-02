@@ -309,4 +309,4 @@ LeanLog is a portfolio project showcasing production-ready iOS development. It d
 
 ---
 
-Copyright © 2025 Lokesh Kaki. All rights reserved.
+Copyright © 2026 Lokesh Kaki. All rights reserved.
