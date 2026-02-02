@@ -22,6 +22,7 @@ struct EditMealView: View {
     @State private var pendingDelete = false
     @FocusState private var focusedField: Field?
 
+    // Use the shared utility (Utilities/LocalizedNumberIO.swift)
     private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
 
     enum Field: Hashable { case name, yield }
@@ -284,7 +285,8 @@ struct EditMealView: View {
     private func save() {
         guard isValid else { return }
         meal.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        meal.totalYieldGrams = numberIO.parseDecimal(totalYieldGrams) ?? meal.totalYieldGrams
+        // Use the shared parser method name
+        meal.totalYieldGrams = numberIO.parseDouble(totalYieldGrams) ?? meal.totalYieldGrams
         meal.ingredients = ingredients
         do {
             try modelContext.save()
@@ -356,57 +358,5 @@ private struct IngredientRowCard: View {
                         .stroke(AppTheme.Colors.subtleStroke, lineWidth: 1)
                 }
         )
-    }
-}
-
-// MARK: - Locale-aware number IO helper
-
-private struct LocalizedNumberIO {
-    private let formatter: NumberFormatter
-
-    init(maxFractionDigits: Int = 2, locale: Locale = .current) {
-        let nf = NumberFormatter()
-        nf.locale = locale
-        nf.numberStyle = .decimal
-        nf.maximumFractionDigits = maxFractionDigits
-        nf.usesGroupingSeparator = false
-        self.formatter = nf
-    }
-
-    private var decimalSeparator: String {
-        formatter.decimalSeparator ?? "."
-    }
-
-    func parseDecimal(_ s: String) -> Double? {
-        guard !s.isEmpty else { return nil }
-        return formatter.number(from: s)?.doubleValue
-    }
-
-    func sanitizeDecimal(_ s: String) -> String {
-        guard !s.isEmpty else { return s }
-        let sep = decimalSeparator
-        var out = ""
-        var seenSep = false
-        for ch in s {
-            if ch.isNumber {
-                out.append(ch)
-            } else if String(ch) == sep, !seenSep {
-                out.append(ch)
-                seenSep = true
-            }
-        }
-        if out.hasPrefix(sep) { out = "0" + out }
-        if let range = out.range(of: sep) {
-            let fractional = out[range.upperBound...]
-            if fractional.count > formatter.maximumFractionDigits {
-                let allowed = fractional.prefix(formatter.maximumFractionDigits)
-                out = String(out[..<range.upperBound]) + allowed
-            }
-        }
-        return out
-    }
-
-    func sanitizeInteger(_ s: String) -> String {
-        s.filter { $0.isNumber }
     }
 }

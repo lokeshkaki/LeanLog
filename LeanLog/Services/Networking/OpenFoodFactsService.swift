@@ -21,20 +21,57 @@ struct OFFResolvedFood: Sendable {
     let servingUnit: String
     let sourceBarcode: String
 
-    // Micronutrients (per serving, grams where applicable)
+    // Carb details
     let sugars: Double?
     let fiber: Double?
-    let sodium: Double?
-    let salt: Double?
+    
+    // Fat details
     let saturatedFat: Double?
     let transFat: Double?
+    let monounsaturatedFat: Double?
+    let polyunsaturatedFat: Double?
+    
+    // Cholesterol & sodium
     let cholesterol: Double?
+    let sodium: Double?
+    let salt: Double?
+    
+    // Major minerals
     let potassium: Double?
     let calcium: Double?
     let iron: Double?
-    let vitaminD: Double?
-    let vitaminC: Double?
+    let magnesium: Double?
+    let phosphorus: Double?
+    let zinc: Double?
+    
+    // Trace minerals
+    let selenium: Double?
+    let copper: Double?
+    let manganese: Double?
+    let chromium: Double?
+    let molybdenum: Double?
+    let iodine: Double?
+    let chloride: Double?
+    
+    // Vitamins
     let vitaminA: Double?
+    let vitaminC: Double?
+    let vitaminD: Double?
+    let vitaminE: Double?
+    let vitaminK: Double?
+    
+    // B Vitamins
+    let thiamin: Double?
+    let riboflavin: Double?
+    let niacin: Double?
+    let pantothenicAcid: Double?
+    let vitaminB6: Double?
+    let biotin: Double?
+    let folate: Double?
+    let vitaminB12: Double?
+    
+    // Other
+    let choline: Double?
 }
 
 // MARK: - Wire models (exact OFF mapping)
@@ -109,13 +146,21 @@ struct OFFNutriments: Decodable {
     let transFat: Double?
     let transFat100g: Double?
     let transFatServing: Double?
+    
+    let monounsaturatedFat: Double?
+    let monounsaturatedFat100g: Double?
+    let monounsaturatedFatServing: Double?
+    
+    let polyunsaturatedFat: Double?
+    let polyunsaturatedFat100g: Double?
+    let polyunsaturatedFatServing: Double?
 
     // Cholesterol
     let cholesterol: Double?
     let cholesterol100g: Double?
     let cholesterolServing: Double?
 
-    // Minerals
+    // Major Minerals
     let potassium: Double?
     let potassium100g: Double?
     let potassiumServing: Double?
@@ -127,19 +172,106 @@ struct OFFNutriments: Decodable {
     let iron: Double?
     let iron100g: Double?
     let ironServing: Double?
+    
+    let magnesium: Double?
+    let magnesium100g: Double?
+    let magnesiumServing: Double?
+    
+    let phosphorus: Double?
+    let phosphorus100g: Double?
+    let phosphorusServing: Double?
+    
+    let zinc: Double?
+    let zinc100g: Double?
+    let zincServing: Double?
+
+    // Trace Minerals
+    let selenium: Double?
+    let selenium100g: Double?
+    let seleniumServing: Double?
+    
+    let copper: Double?
+    let copper100g: Double?
+    let copperServing: Double?
+    
+    let manganese: Double?
+    let manganese100g: Double?
+    let manganeseServing: Double?
+    
+    let chromium: Double?
+    let chromium100g: Double?
+    let chromiumServing: Double?
+    
+    let molybdenum: Double?
+    let molybdenum100g: Double?
+    let molybdenumServing: Double?
+    
+    let iodine: Double?
+    let iodine100g: Double?
+    let iodineServing: Double?
+    
+    let chloride: Double?
+    let chloride100g: Double?
+    let chlorideServing: Double?
 
     // Vitamins
-    let vitaminD: Double?
-    let vitaminD100g: Double?
-    let vitaminDServing: Double?
-
+    let vitaminA: Double?
+    let vitaminA100g: Double?
+    let vitaminAServing: Double?
+    
     let vitaminC: Double?
     let vitaminC100g: Double?
     let vitaminCServing: Double?
 
-    let vitaminA: Double?
-    let vitaminA100g: Double?
-    let vitaminAServing: Double?
+    let vitaminD: Double?
+    let vitaminD100g: Double?
+    let vitaminDServing: Double?
+    
+    let vitaminE: Double?
+    let vitaminE100g: Double?
+    let vitaminEServing: Double?
+    
+    let vitaminK: Double?
+    let vitaminK100g: Double?
+    let vitaminKServing: Double?
+    
+    // B Vitamins
+    let thiamin: Double?
+    let thiamin100g: Double?
+    let thiaminServing: Double?
+    
+    let riboflavin: Double?
+    let riboflavin100g: Double?
+    let riboflavinServing: Double?
+    
+    let niacin: Double?
+    let niacin100g: Double?
+    let niacinServing: Double?
+    
+    let pantothenicAcid: Double?
+    let pantothenicAcid100g: Double?
+    let pantothenicAcidServing: Double?
+    
+    let vitaminB6: Double?
+    let vitaminB6_100g: Double?
+    let vitaminB6Serving: Double?
+    
+    let biotin: Double?
+    let biotin100g: Double?
+    let biotinServing: Double?
+    
+    let folate: Double?
+    let folate100g: Double?
+    let folateServing: Double?
+    
+    let vitaminB12: Double?
+    let vitaminB12_100g: Double?
+    let vitaminB12Serving: Double?
+    
+    // Other
+    let choline: Double?
+    let choline100g: Double?
+    let cholineServing: Double?
 
     enum CodingKeys: String, CodingKey {
         case energyKcal         = "energy-kcal"
@@ -181,6 +313,14 @@ struct OFFNutriments: Decodable {
         case transFat           = "trans-fat"
         case transFat100g       = "trans-fat_100g"
         case transFatServing    = "trans-fat_serving"
+        
+        case monounsaturatedFat = "monounsaturated-fat"
+        case monounsaturatedFat100g = "monounsaturated-fat_100g"
+        case monounsaturatedFatServing = "monounsaturated-fat_serving"
+        
+        case polyunsaturatedFat = "polyunsaturated-fat"
+        case polyunsaturatedFat100g = "polyunsaturated-fat_100g"
+        case polyunsaturatedFatServing = "polyunsaturated-fat_serving"
 
         case cholesterol
         case cholesterol100g    = "cholesterol_100g"
@@ -197,18 +337,102 @@ struct OFFNutriments: Decodable {
         case iron
         case iron100g           = "iron_100g"
         case ironServing        = "iron_serving"
-
-        case vitaminD           = "vitamin-d"
-        case vitaminD100g       = "vitamin-d_100g"
-        case vitaminDServing    = "vitamin-d_serving"
-
-        case vitaminC           = "vitamin-c"
-        case vitaminC100g       = "vitamin-c_100g"
-        case vitaminCServing    = "vitamin-c_serving"
+        
+        case magnesium
+        case magnesium100g      = "magnesium_100g"
+        case magnesiumServing   = "magnesium_serving"
+        
+        case phosphorus
+        case phosphorus100g     = "phosphorus_100g"
+        case phosphorusServing  = "phosphorus_serving"
+        
+        case zinc
+        case zinc100g           = "zinc_100g"
+        case zincServing        = "zinc_serving"
+        
+        case selenium
+        case selenium100g       = "selenium_100g"
+        case seleniumServing    = "selenium_serving"
+        
+        case copper
+        case copper100g         = "copper_100g"
+        case copperServing      = "copper_serving"
+        
+        case manganese
+        case manganese100g      = "manganese_100g"
+        case manganeseServing   = "manganese_serving"
+        
+        case chromium
+        case chromium100g       = "chromium_100g"
+        case chromiumServing    = "chromium_serving"
+        
+        case molybdenum
+        case molybdenum100g     = "molybdenum_100g"
+        case molybdenumServing  = "molybdenum_serving"
+        
+        case iodine
+        case iodine100g         = "iodine_100g"
+        case iodineServing      = "iodine_serving"
+        
+        case chloride
+        case chloride100g       = "chloride_100g"
+        case chlorideServing    = "chloride_serving"
 
         case vitaminA           = "vitamin-a"
         case vitaminA100g       = "vitamin-a_100g"
         case vitaminAServing    = "vitamin-a_serving"
+        
+        case vitaminC           = "vitamin-c"
+        case vitaminC100g       = "vitamin-c_100g"
+        case vitaminCServing    = "vitamin-c_serving"
+
+        case vitaminD           = "vitamin-d"
+        case vitaminD100g       = "vitamin-d_100g"
+        case vitaminDServing    = "vitamin-d_serving"
+        
+        case vitaminE           = "vitamin-e"
+        case vitaminE100g       = "vitamin-e_100g"
+        case vitaminEServing    = "vitamin-e_serving"
+        
+        case vitaminK           = "vitamin-k"
+        case vitaminK100g       = "vitamin-k_100g"
+        case vitaminKServing    = "vitamin-k_serving"
+        
+        case thiamin
+        case thiamin100g        = "thiamin_100g"
+        case thiaminServing     = "thiamin_serving"
+        
+        case riboflavin
+        case riboflavin100g     = "riboflavin_100g"
+        case riboflavinServing  = "riboflavin_serving"
+        
+        case niacin
+        case niacin100g         = "niacin_100g"
+        case niacinServing      = "niacin_serving"
+        
+        case pantothenicAcid    = "pantothenic-acid"
+        case pantothenicAcid100g = "pantothenic-acid_100g"
+        case pantothenicAcidServing = "pantothenic-acid_serving"
+        
+        case vitaminB6          = "vitamin-b6"
+        case vitaminB6_100g     = "vitamin-b6_100g"
+        case vitaminB6Serving   = "vitamin-b6_serving"
+        
+        case biotin
+        case biotin100g         = "biotin_100g"
+        case biotinServing      = "biotin_serving"
+        
+        case folate
+        case folate100g         = "folate_100g"
+        case folateServing      = "folate_serving"
+        
+        case vitaminB12         = "vitamin-b12"
+        case vitaminB12_100g    = "vitamin-b12_100g"
+        case vitaminB12Serving  = "vitamin-b12_serving"
+        
+        case choline
+        case choline100g        = "choline_100g"
+        case cholineServing     = "choline_serving"
     }
 }
 
@@ -233,8 +457,8 @@ enum OFFError: LocalizedError, Sendable {
 // MARK: - Service
 
 final class OpenFoodFactsService: @unchecked Sendable {
-    private let userAgent = "LeanLog/1.0 (https://github.com/LightYagamiTheDev/LeanLog)" // OFF recommends custom UA
-    private let base = "https://world.openfoodfacts.net/api/v2" // v2 product endpoint
+    private let userAgent = "LeanLog/1.0 (https://github.com/LightYagamiTheDev/LeanLog)"
+    private let base = "https://world.openfoodfacts.net/api/v2"
     private let session: URLSession
 
     init(session: URLSession = .shared) {
@@ -306,71 +530,73 @@ final class OpenFoodFactsService: @unchecked Sendable {
             servingSize: servingSize,
             servingUnit: servingUnit,
             sourceBarcode: product.code ?? fallbackBarcode,
+            // Carb details
             sugars: micros.sugars,
             fiber: micros.fiber,
-            sodium: derived.sodium,
-            salt: derived.salt,
+            // Fat details
             saturatedFat: micros.saturatedFat,
             transFat: micros.transFat,
+            monounsaturatedFat: micros.monounsaturatedFat,
+            polyunsaturatedFat: micros.polyunsaturatedFat,
+            // Cholesterol & sodium
             cholesterol: micros.cholesterol,
+            sodium: derived.sodium,
+            salt: derived.salt,
+            // Major minerals
             potassium: micros.potassium,
             calcium: micros.calcium,
             iron: micros.iron,
-            vitaminD: micros.vitaminD,
+            magnesium: micros.magnesium,
+            phosphorus: micros.phosphorus,
+            zinc: micros.zinc,
+            // Trace minerals
+            selenium: micros.selenium,
+            copper: micros.copper,
+            manganese: micros.manganese,
+            chromium: micros.chromium,
+            molybdenum: micros.molybdenum,
+            iodine: micros.iodine,
+            chloride: micros.chloride,
+            // Vitamins
+            vitaminA: micros.vitaminA,
             vitaminC: micros.vitaminC,
-            vitaminA: micros.vitaminA
+            vitaminD: micros.vitaminD,
+            vitaminE: micros.vitaminE,
+            vitaminK: micros.vitaminK,
+            // B Vitamins
+            thiamin: micros.thiamin,
+            riboflavin: micros.riboflavin,
+            niacin: micros.niacin,
+            pantothenicAcid: micros.pantothenicAcid,
+            vitaminB6: micros.vitaminB6,
+            biotin: micros.biotin,
+            folate: micros.folate,
+            vitaminB12: micros.vitaminB12,
+            // Other
+            choline: micros.choline
         )
     }
 
-    private func resolvedMicros(_ n: OFFNutriments?, serving: Double) -> (
-        sugars: Double?, fiber: Double?, sodium: Double?, salt: Double?,
-        saturatedFat: Double?, transFat: Double?, cholesterol: Double?,
-        potassium: Double?, calcium: Double?, iron: Double?,
-        vitaminD: Double?, vitaminC: Double?, vitaminA: Double?
-    ) {
-        guard let n else {
-            return (nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-        }
-        func pref(_ servingVal: Double?, _ per100: Double?, _ raw: Double?) -> Double? {
-            servingVal ?? scaled(valuePer100g: per100 ?? raw, serving: serving)
-        }
-        let sugars = pref(n.sugarsServing, n.sugars100g, n.sugars)
-        let fiber  = pref(n.fiberServing, n.fiber100g, n.fiber)
-        let sodium = pref(n.sodiumServing, n.sodium100g, n.sodium)
-        let salt   = pref(n.saltServing, n.salt100g, n.salt)
-        let sat    = pref(n.saturatedFatServing, n.saturatedFat100g, n.saturatedFat)
-        let trans  = pref(n.transFatServing, n.transFat100g, n.transFat)
-        let chol   = pref(n.cholesterolServing, n.cholesterol100g, n.cholesterol)
-        let k      = pref(n.potassiumServing, n.potassium100g, n.potassium)
-        let ca     = pref(n.calciumServing, n.calcium100g, n.calcium)
-        let fe     = pref(n.ironServing, n.iron100g, n.iron)
-        let vd     = pref(n.vitaminDServing, n.vitaminD100g, n.vitaminD)
-        let vc     = pref(n.vitaminCServing, n.vitaminC100g, n.vitaminC)
-        let va     = pref(n.vitaminAServing, n.vitaminA100g, n.vitaminA)
-        return (sugars, fiber, sodium, salt, sat, trans, chol, k, ca, fe, vd, vc, va)
-    }
-
-    private func deriveSaltSodiumIfMissing(sodium: Double?, salt: Double?) -> (sodium: Double?, salt: Double?) {
-        // OFF values are normalized in grams for per-100g and per-serving
-        if let sodium, salt == nil {
-            // salt (g) ≈ sodium (g) * 2.5
-            return (sodium, sodium * 2.5)
-        }
-        if let salt, sodium == nil {
-            // sodium (g) ≈ salt (g) * 0.393
-            return (salt * 0.393, salt)
-        }
-        return (sodium, salt)
-    }
-
     private func displayName(product: OFFProduct) -> String {
-        let trimmed = product.productName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let p = (trimmed?.isEmpty == false) ? trimmed : nil
-        if let brand = product.brands?.split(separator: ",").first.map({ String($0).trimmingCharacters(in: .whitespaces) }),
-           let p {
-            return "\(brand) \(p)"
+        let n = product.productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return n.isEmpty ? "Unknown Product" : n
+    }
+
+    private func parseServing(_ str: String?) -> (size: Double, unit: String)? {
+        guard let s = str?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+        let pattern = #"^([\d.,]+)\s*([a-zA-Z]+)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
+              let match = regex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) else {
+            return nil
         }
-        return p ?? product.brands ?? "Unknown Product"
+        guard let numRange = Range(match.range(at: 1), in: s),
+              let unitRange = Range(match.range(at: 2), in: s) else {
+            return nil
+        }
+        let numStr = String(s[numRange]).replacingOccurrences(of: ",", with: ".")
+        guard let size = Double(numStr) else { return nil }
+        let unit = String(s[unitRange])
+        return (size, unit)
     }
 
     private func scaled(valuePer100g: Double?, serving: Double) -> Double? {
@@ -378,50 +604,95 @@ final class OpenFoodFactsService: @unchecked Sendable {
         return v * (serving / 100.0)
     }
 
-    private func parseServing(_ s: String?) -> (Double, String)? {
-        guard let s = s?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
-
-        if let paren = s.range(of: #"\((.*?)\)"#, options: .regularExpression) {
-            let inside = String(s[paren]).replacingOccurrences(of: ["(", ")"], with: "")
-            if let t = firstNumberUnit(in: inside) { return t }
+    private func resolvedMicros(_ n: OFFNutriments?, serving: Double) -> (
+        sugars: Double?,
+        fiber: Double?,
+        saturatedFat: Double?,
+        transFat: Double?,
+        monounsaturatedFat: Double?,
+        polyunsaturatedFat: Double?,
+        cholesterol: Double?,
+        sodium: Double?,
+        salt: Double?,
+        potassium: Double?,
+        calcium: Double?,
+        iron: Double?,
+        magnesium: Double?,
+        phosphorus: Double?,
+        zinc: Double?,
+        selenium: Double?,
+        copper: Double?,
+        manganese: Double?,
+        chromium: Double?,
+        molybdenum: Double?,
+        iodine: Double?,
+        chloride: Double?,
+        vitaminA: Double?,
+        vitaminC: Double?,
+        vitaminD: Double?,
+        vitaminE: Double?,
+        vitaminK: Double?,
+        thiamin: Double?,
+        riboflavin: Double?,
+        niacin: Double?,
+        pantothenicAcid: Double?,
+        vitaminB6: Double?,
+        biotin: Double?,
+        folate: Double?,
+        vitaminB12: Double?,
+        choline: Double?
+    ) {
+        func pick(_ servingVal: Double?, _ per100g: Double?) -> Double? {
+            servingVal ?? scaled(valuePer100g: per100g, serving: serving)
         }
-        if let t = firstNumberUnit(in: s) { return t }
-        if let n = firstNumberOnly(in: s) { return (n, "g") }
-        return nil
+        
+        return (
+            sugars: pick(n?.sugarsServing, n?.sugars100g ?? n?.sugars),
+            fiber: pick(n?.fiberServing, n?.fiber100g ?? n?.fiber),
+            saturatedFat: pick(n?.saturatedFatServing, n?.saturatedFat100g ?? n?.saturatedFat),
+            transFat: pick(n?.transFatServing, n?.transFat100g ?? n?.transFat),
+            monounsaturatedFat: pick(n?.monounsaturatedFatServing, n?.monounsaturatedFat100g ?? n?.monounsaturatedFat),
+            polyunsaturatedFat: pick(n?.polyunsaturatedFatServing, n?.polyunsaturatedFat100g ?? n?.polyunsaturatedFat),
+            cholesterol: pick(n?.cholesterolServing, n?.cholesterol100g ?? n?.cholesterol),
+            sodium: pick(n?.sodiumServing, n?.sodium100g ?? n?.sodium),
+            salt: pick(n?.saltServing, n?.salt100g ?? n?.salt),
+            potassium: pick(n?.potassiumServing, n?.potassium100g ?? n?.potassium),
+            calcium: pick(n?.calciumServing, n?.calcium100g ?? n?.calcium),
+            iron: pick(n?.ironServing, n?.iron100g ?? n?.iron),
+            magnesium: pick(n?.magnesiumServing, n?.magnesium100g ?? n?.magnesium),
+            phosphorus: pick(n?.phosphorusServing, n?.phosphorus100g ?? n?.phosphorus),
+            zinc: pick(n?.zincServing, n?.zinc100g ?? n?.zinc),
+            selenium: pick(n?.seleniumServing, n?.selenium100g ?? n?.selenium),
+            copper: pick(n?.copperServing, n?.copper100g ?? n?.copper),
+            manganese: pick(n?.manganeseServing, n?.manganese100g ?? n?.manganese),
+            chromium: pick(n?.chromiumServing, n?.chromium100g ?? n?.chromium),
+            molybdenum: pick(n?.molybdenumServing, n?.molybdenum100g ?? n?.molybdenum),
+            iodine: pick(n?.iodineServing, n?.iodine100g ?? n?.iodine),
+            chloride: pick(n?.chlorideServing, n?.chloride100g ?? n?.chloride),
+            vitaminA: pick(n?.vitaminAServing, n?.vitaminA100g ?? n?.vitaminA),
+            vitaminC: pick(n?.vitaminCServing, n?.vitaminC100g ?? n?.vitaminC),
+            vitaminD: pick(n?.vitaminDServing, n?.vitaminD100g ?? n?.vitaminD),
+            vitaminE: pick(n?.vitaminEServing, n?.vitaminE100g ?? n?.vitaminE),
+            vitaminK: pick(n?.vitaminKServing, n?.vitaminK100g ?? n?.vitaminK),
+            thiamin: pick(n?.thiaminServing, n?.thiamin100g ?? n?.thiamin),
+            riboflavin: pick(n?.riboflavinServing, n?.riboflavin100g ?? n?.riboflavin),
+            niacin: pick(n?.niacinServing, n?.niacin100g ?? n?.niacin),
+            pantothenicAcid: pick(n?.pantothenicAcidServing, n?.pantothenicAcid100g ?? n?.pantothenicAcid),
+            vitaminB6: pick(n?.vitaminB6Serving, n?.vitaminB6_100g ?? n?.vitaminB6),
+            biotin: pick(n?.biotinServing, n?.biotin100g ?? n?.biotin),
+            folate: pick(n?.folateServing, n?.folate100g ?? n?.folate),
+            vitaminB12: pick(n?.vitaminB12Serving, n?.vitaminB12_100g ?? n?.vitaminB12),
+            choline: pick(n?.cholineServing, n?.choline100g ?? n?.choline)
+        )
     }
 
-    private func firstNumberUnit(in s: String) -> (Double, String)? {
-        let patterns = [
-            #"(\d+(\.\d+)?)\s*(g|gram|grams)\b"#,
-            #"(\d+(\.\d+)?)\s*(ml|milliliter|milliliters)\b"#
-        ]
-        for p in patterns {
-            if let r = s.range(of: p, options: .regularExpression) {
-                let token = String(s[r])
-                let parts = token.split(whereSeparator: { $0.isWhitespace })
-                if let num = Double(parts.first?.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression) ?? "") {
-                    let unitToken = parts.last?.lowercased() ?? "g"
-                    if unitToken.hasPrefix("ml") || unitToken.hasPrefix("milliliter") { return (num, "ml") }
-                    return (num, "g")
-                }
-            }
+    private func deriveSaltSodiumIfMissing(sodium: Double?, salt: Double?) -> (sodium: Double?, salt: Double?) {
+        if let s = sodium, salt == nil {
+            return (s, s * 2.5)
         }
-        return nil
-    }
-
-    private func firstNumberOnly(in s: String) -> Double? {
-        if let r = s.range(of: #"(\d+(\.\d+)?)"#, options: .regularExpression) {
-            return Double(s[r])
+        if let sa = salt, sodium == nil {
+            return (sa * 0.393, sa)
         }
-        return nil
-    }
-}
-
-// Convenience replace occurrences helper
-private extension String {
-    func replacingOccurrences(of targets: [String], with replacement: String = "") -> String {
-        var result = self
-        for t in targets { result = result.replacingOccurrences(of: t, with: replacement) }
-        return result
+        return (sodium, salt)
     }
 }
