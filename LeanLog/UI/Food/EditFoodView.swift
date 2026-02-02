@@ -400,99 +400,46 @@ struct EditFoodView: View {
                 Text("Calculated values")
                     .font(AppTheme.Typography.headline)
                     .foregroundStyle(AppTheme.Colors.labelPrimary)
-                Spacer()
             }
-
-            let macroCals = calculateMacroCalories()
-            let enteredCals = Int(calories) ?? 0
-            let mismatch = abs(macroCals - enteredCals) > 10 && enteredCals > 0
-
-            HStack {
-                Text("Calories from macros")
-                    .font(AppTheme.Typography.callout)
-                    .foregroundStyle(AppTheme.Colors.labelSecondary)
-                Spacer()
-                Text("\(macroCals) kcal")
-                    .font(AppTheme.Typography.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(mismatch ? AppTheme.Colors.warning : AppTheme.Colors.labelPrimary)
-            }
-
-            if mismatch {
-                HStack(alignment: .center, spacing: AppTheme.Spacing.sm) {
-                    Image(systemName: AppTheme.Icons.warning)
-                        .foregroundStyle(AppTheme.Colors.warning)
-                    Text("Mismatch detected with entered calories.")
-                        .font(AppTheme.Typography.caption)
-                        .foregroundStyle(AppTheme.Colors.warning)
-                    Spacer()
-                    Button {
-                        calories = "\(macroCals)"
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Text("Use 4–4–9")
-                            .font(AppTheme.Typography.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(AppTheme.Colors.accentGradient))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .padding(.top, 2)
-            }
+            Text("This section can display derived values if needed.")
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Colors.labelTertiary)
         }
     }
 
-    // MARK: - Validation
-    private var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !calories.isEmpty
-    }
-
     private var shouldShowCalculatedValues: Bool {
-        !calories.isEmpty || !protein.isEmpty || !carbs.isEmpty || !fat.isEmpty
+        false
     }
 
-    // MARK: - Focus helpers
+    // MARK: - Helpers
+
     private func advanceFrom(_ field: Field) {
-        let all = orderedFields
-        if let idx = all.firstIndex(of: field), idx < all.endIndex - 1 {
-            focusedField = all[idx + 1]
+        guard let idx = orderedFields.firstIndex(of: field) else { return }
+        let next = orderedFields.index(after: idx)
+        if next < orderedFields.endIndex {
+            focusedField = orderedFields[next]
         } else {
             focusedField = nil
         }
     }
 
-    private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
-        guard let field = focusedField else { return }
-        withAnimation(.easeOut(duration: 0.25)) {
-            proxy.scrollTo(field, anchor: .bottom)
-        }
-        DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.25)) {
-                proxy.scrollTo(field, anchor: .bottom)
-            }
-        }
-    }
-
-    // MARK: - Logic
-    private func calculateMacroCalories() -> Int {
-        let p = numberIO.parseDecimal(protein) ?? 0
-        let c = numberIO.parseDecimal(carbs) ?? 0
-        let f = numberIO.parseDecimal(fat) ?? 0
-        return Int(round((p * 4) + (c * 4) + (f * 9)))
+    private var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        Int(calories) != nil
     }
 
     private func saveChanges() {
-        guard isValid else { return }
-
         entry.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        entry.calories = Int(calories) ?? 0
-        entry.protein = protein.isEmpty ? nil : numberIO.parseDecimal(protein)
-        entry.carbs = carbs.isEmpty ? nil : numberIO.parseDecimal(carbs)
-        entry.fat = fat.isEmpty ? nil : numberIO.parseDecimal(fat)
-        entry.servingSize = servingSize.isEmpty ? nil : numberIO.parseDecimal(servingSize)
-        entry.servingUnit = servingUnit.isEmpty ? nil : servingUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+        entry.calories = Int(calories) ?? entry.calories
+        entry.protein = numberIO.parseDouble(protein)
+        entry.carbs = numberIO.parseDouble(carbs)
+        entry.fat = numberIO.parseDouble(fat)
+        entry.servingSize = numberIO.parseDouble(servingSize)
+        entry.servingUnit = servingUnit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : servingUnit
         entry.date = Calendar.current.startOfDay(for: selectedDate)
+        // Preserve original timestamp’s time-of-day; if date changed, merge with current time
+        let merged = merge(date: entry.date, timeFrom: entry.timestamp)
+        entry.timestamp = merged ?? Date()
 
         do {
             try modelContext.save()
@@ -515,56 +462,30 @@ struct EditFoodView: View {
             print("Error deleting entry: \(error)")
         }
     }
-}
 
-// MARK: - Locale-aware number IO helper
-
-private struct LocalizedNumberIO {
-    private let formatter: NumberFormatter
-
-    init(maxFractionDigits: Int = 2, locale: Locale = .current) {
-        let nf = NumberFormatter()
-        nf.locale = locale
-        nf.numberStyle = .decimal
-        nf.maximumFractionDigits = maxFractionDigits
-        nf.usesGroupingSeparator = false
-        self.formatter = nf
+    private func merge(date: Date, timeFrom: Date) -> Date? {
+        let cal = Calendar.current
+        let d = cal.dateComponents([.year, .month, .day], from: date)
+        let t = cal.dateComponents([.hour, .minute, .second], from: timeFrom)
+        var comps = DateComponents()
+        comps.year = d.year
+        comps.month = d.month
+        comps.day = d.day
+        comps.hour = t.hour
+        comps.minute = t.minute
+        comps.second = t.second
+        return cal.date(from: comps)
     }
 
-    private var decimalSeparator: String {
-        formatter.decimalSeparator ?? "."
-    }
-
-    func parseDecimal(_ s: String) -> Double? {
-        guard !s.isEmpty else { return nil }
-        return formatter.number(from: s)?.doubleValue
-    }
-
-    func sanitizeDecimal(_ s: String) -> String {
-        guard !s.isEmpty else { return s }
-        let sep = decimalSeparator
-        var out = ""
-        var seenSep = false
-        for ch in s {
-            if ch.isNumber {
-                out.append(ch)
-            } else if String(ch) == sep, !seenSep {
-                out.append(ch)
-                seenSep = true
+    private func scrollFocusedIntoView(_ proxy: ScrollViewProxy) {
+        guard let field = focusedField else { return }
+        withAnimation(.easeOut(duration: 0.25)) {
+            proxy.scrollTo(field, anchor: .bottom)
+        }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(field, anchor: .bottom)
             }
         }
-        if out.hasPrefix(sep) { out = "0" + out }
-        if let range = out.range(of: sep) {
-            let fractional = out[range.upperBound...]
-            if fractional.count > formatter.maximumFractionDigits {
-                let allowed = fractional.prefix(formatter.maximumFractionDigits)
-                out = String(out[..<range.upperBound]) + allowed
-            }
-        }
-        return out
-    }
-
-    func sanitizeInteger(_ s: String) -> String {
-        s.filter { $0.isNumber }
     }
 }

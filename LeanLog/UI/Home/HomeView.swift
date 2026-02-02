@@ -3,8 +3,8 @@
 //  LeanLog
 //
 //  Updated: After scanning (OFF), present AddFoodView with Prefill for editing before save.
-//  Includes helper subviews (DateHeaderView, DailyTotalsView, DailyEntriesSection, FloatingActionButton)
-//  so symbols are in scope for this file.
+//  Scanner callback now includes barcode so AddFoodView can enrich micros.
+//  Helper subviews kept inline for scope.
 //
 
 import SwiftUI
@@ -27,7 +27,7 @@ struct HomeView: View {
     @State private var editingEntry: FoodEntry?
     @State private var showDatePicker = false
 
-    // Pending scanned draft to edit
+    // Pending scanned draft to edit - updated with all micronutrient fields
     struct ScannedDraft: Identifiable {
         let id = UUID()
         let name: String
@@ -38,6 +38,44 @@ struct HomeView: View {
         let servingSize: Double
         let servingUnit: String
         let barcode: String?
+
+        // All micros - kept nil for forward compatibility (will be enriched by AddFoodView)
+        let sugars: Double? = nil
+        let fiber: Double? = nil
+        let saturatedFat: Double? = nil
+        let transFat: Double? = nil
+        let monounsaturatedFat: Double? = nil
+        let polyunsaturatedFat: Double? = nil
+        let cholesterol: Double? = nil
+        let sodium: Double? = nil
+        let salt: Double? = nil
+        let potassium: Double? = nil
+        let calcium: Double? = nil
+        let iron: Double? = nil
+        let magnesium: Double? = nil
+        let phosphorus: Double? = nil
+        let zinc: Double? = nil
+        let selenium: Double? = nil
+        let copper: Double? = nil
+        let manganese: Double? = nil
+        let chromium: Double? = nil
+        let molybdenum: Double? = nil
+        let iodine: Double? = nil
+        let chloride: Double? = nil
+        let vitaminA: Double? = nil
+        let vitaminC: Double? = nil
+        let vitaminD: Double? = nil
+        let vitaminE: Double? = nil
+        let vitaminK: Double? = nil
+        let thiamin: Double? = nil
+        let riboflavin: Double? = nil
+        let niacin: Double? = nil
+        let pantothenicAcid: Double? = nil
+        let vitaminB6: Double? = nil
+        let biotin: Double? = nil
+        let folate: Double? = nil
+        let vitaminB12: Double? = nil
+        let choline: Double? = nil
     }
     @State private var scannedDraft: ScannedDraft?
 
@@ -137,8 +175,8 @@ struct HomeView: View {
                 FoodSearchView()
             }
             .fullScreenCover(isPresented: $showingBarcodeScanner) {
-                // OFF-backed scanner → draft to edit (do not insert here)
-                BarcodeScannerWrapper { name, calories, protein, carbs, fat, servingSize, servingUnit in
+                // Updated scanner closure includes barcode
+                BarcodeScannerWrapper { name, calories, protein, carbs, fat, servingSize, servingUnit, barcode in
                     scannedDraft = ScannedDraft(
                         name: name,
                         calories: calories,
@@ -147,11 +185,10 @@ struct HomeView: View {
                         fat: fat,
                         servingSize: servingSize,
                         servingUnit: servingUnit,
-                        barcode: nil
+                        barcode: barcode
                     )
                 }
             }
-            // Editor sheet shown after scan; user can adjust, then Save writes to SwiftData
             .sheet(item: $scannedDraft) { draft in
                 AddFoodView(
                     defaultDate: selectedDay,
@@ -164,7 +201,51 @@ struct HomeView: View {
                         servingSize: draft.servingSize,
                         servingUnit: draft.servingUnit,
                         source: "OFF",
-                        externalId: draft.barcode
+                        externalId: draft.barcode,
+                        // Carb details
+                        sugars: draft.sugars,
+                        fiber: draft.fiber,
+                        // Fat details
+                        saturatedFat: draft.saturatedFat,
+                        transFat: draft.transFat,
+                        monounsaturatedFat: draft.monounsaturatedFat,
+                        polyunsaturatedFat: draft.polyunsaturatedFat,
+                        // Cholesterol & sodium
+                        cholesterol: draft.cholesterol,
+                        sodium: draft.sodium,
+                        salt: draft.salt,
+                        // Major minerals
+                        potassium: draft.potassium,
+                        calcium: draft.calcium,
+                        iron: draft.iron,
+                        magnesium: draft.magnesium,
+                        phosphorus: draft.phosphorus,
+                        zinc: draft.zinc,
+                        // Trace minerals
+                        selenium: draft.selenium,
+                        copper: draft.copper,
+                        manganese: draft.manganese,
+                        chromium: draft.chromium,
+                        molybdenum: draft.molybdenum,
+                        iodine: draft.iodine,
+                        chloride: draft.chloride,
+                        // Vitamins
+                        vitaminA: draft.vitaminA,
+                        vitaminC: draft.vitaminC,
+                        vitaminD: draft.vitaminD,
+                        vitaminE: draft.vitaminE,
+                        vitaminK: draft.vitaminK,
+                        // B Vitamins
+                        thiamin: draft.thiamin,
+                        riboflavin: draft.riboflavin,
+                        niacin: draft.niacin,
+                        pantothenicAcid: draft.pantothenicAcid,
+                        vitaminB6: draft.vitaminB6,
+                        biotin: draft.biotin,
+                        folate: draft.folate,
+                        vitaminB12: draft.vitaminB12,
+                        // Other
+                        choline: draft.choline
                     )
                 )
             }
