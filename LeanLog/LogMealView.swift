@@ -471,18 +471,21 @@ struct LogMealView: View {
                 let c = (ing.carbs ?? 0) * ing.quantity * factor
                 let f = (ing.fat ?? 0) * ing.quantity * factor
 
+                // Updated parameter order to match FoodEntry initializer:
+                // name, calories, servingSize, servingUnit, date, timestamp, source, externalId, then macros/micros.
                 let entry = FoodEntry(
                     name: ing.name,
                     calories: cals,
-                    protein: p > 0 ? p : nil,
-                    carbs: c > 0 ? c : nil,
-                    fat: f > 0 ? f : nil,
                     servingSize: ing.servingSize,
                     servingUnit: ing.servingUnit,
                     date: selectedDate,
                     timestamp: ts,
                     source: "Meal: \(meal.name)",
-                    externalId: nil
+                    externalId: nil,
+                    protein: p > 0 ? p : nil,
+                    carbs: c > 0 ? c : nil,
+                    fat: f > 0 ? f : nil
+                    // Micronutrients can be passed here if available; omitted defaults to nil.
                 )
                 modelContext.insert(entry)
             }
@@ -491,15 +494,16 @@ struct LogMealView: View {
             let entry = FoodEntry(
                 name: meal.name,
                 calories: Int(round(n.calories)),
-                protein: n.protein,
-                carbs: n.carbs,
-                fat: n.fat,
                 servingSize: portionGrams,
                 servingUnit: "g",
                 date: selectedDate,
                 timestamp: ts,
                 source: "Meal",
-                externalId: nil
+                externalId: nil,
+                protein: n.protein,
+                carbs: n.carbs,
+                fat: n.fat
+                // Micronutrients omitted; defaults to nil.
             )
             modelContext.insert(entry)
         }

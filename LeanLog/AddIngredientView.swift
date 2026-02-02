@@ -45,7 +45,7 @@ struct AddIngredientView: View {
     @Query(sort: [SortDescriptor(\FoodEntry.timestamp, order: .reverse)])
     private var allEntries: [FoodEntry]
 
-    // Locale-aware number IO
+    // Locale-aware number IO (shared utility)
     private let numberIO = LocalizedNumberIO(maxFractionDigits: 2)
 
     private var isManualValid: Bool {
@@ -568,57 +568,5 @@ struct AddIngredientView: View {
                 proxy.scrollTo(field, anchor: .bottom)
             }
         }
-    }
-}
-
-// MARK: - Locale-aware number IO helper
-
-private struct LocalizedNumberIO {
-    private let formatter: NumberFormatter
-
-    init(maxFractionDigits: Int = 2, locale: Locale = .current) {
-        let nf = NumberFormatter()
-        nf.locale = locale
-        nf.numberStyle = .decimal
-        nf.maximumFractionDigits = maxFractionDigits
-        nf.usesGroupingSeparator = false
-        self.formatter = nf
-    }
-
-    private var decimalSeparator: String {
-        formatter.decimalSeparator ?? "."
-    }
-
-    func parseDecimal(_ s: String) -> Double? {
-        guard !s.isEmpty else { return nil }
-        return formatter.number(from: s)?.doubleValue
-    }
-
-    func sanitizeDecimal(_ s: String) -> String {
-        guard !s.isEmpty else { return s }
-        let sep = decimalSeparator
-        var out = ""
-        var seenSep = false
-        for ch in s {
-            if ch.isNumber {
-                out.append(ch)
-            } else if String(ch) == sep, !seenSep {
-                out.append(ch)
-                seenSep = true
-            }
-        }
-        if out.hasPrefix(sep) { out = "0" + out }
-        if let range = out.range(of: sep) {
-            let fractional = out[range.upperBound...]
-            if fractional.count > formatter.maximumFractionDigits {
-                let allowed = fractional.prefix(formatter.maximumFractionDigits)
-                out = String(out[..<range.upperBound]) + allowed
-            }
-        }
-        return out
-    }
-
-    func sanitizeInteger(_ s: String) -> String {
-        s.filter { $0.isNumber }
     }
 }
