@@ -174,17 +174,14 @@ LeanLog/
 
 2. **Configure API Keys**
    
-   Create a `Secrets.plist` file in the `LeanLog/` directory:
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-   <plist version="1.0">
-   <dict>
-       <key>USDA_API_KEY</key>
-       <string>YOUR_USDA_API_KEY_HERE</string>
-   </dict>
-   </plist>
+   Copy the template and add your API key:
+   ```bash
+   cp LeanLog/Secrets.plist.template LeanLog/Secrets.plist
    ```
+   
+   Then edit `Secrets.plist` and replace `YOUR_USDA_API_KEY_HERE` with your actual API key.
+   
+   ⚠️ **Important**: `Secrets.plist` is excluded from version control. Never commit it to git.
 
 3. **Open in Xcode**
    ```bash
@@ -198,8 +195,9 @@ LeanLog/
 ### Getting a USDA API Key
 
 1. Visit [USDA FoodData Central API](https://fdc.nal.usda.gov/api-key-signup.html)
-2. Sign up for a free API key
-3. Add the key to `Secrets.plist`
+2. Sign up for a free API key (requires valid email address)
+3. Copy your API key from the confirmation email
+4. Add the key to `Secrets.plist` (never commit this file!)
 
 ## Usage Guide
 
@@ -291,7 +289,8 @@ LeanLog is a portfolio project showcasing production-ready iOS development. It d
 - All data stored locally using SwiftData - no cloud sync or remote storage
 - Zero analytics, crash reporting, or user behavior tracking
 - API calls go directly to USDA/OpenFoodFacts - no intermediary servers
-- API keys stored in excluded plist file, never committed to version control
+- API keys stored in excluded plist file (`.gitignore` prevents accidental commits)
+- Template file provided for easy setup
 
 ## Future Enhancements
 

@@ -27,3 +27,7 @@ Packages/
 Package.pins
 Package.resolved
 .swiftpm
+
+# Secrets - API keys and sensitive data
+Secrets.plist
+Secrets.swift
